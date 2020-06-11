@@ -1,0 +1,79 @@
+apply plugin: 'application'
+
+sourceSets.main.resources.srcDirs += [rootProject.file('assets').path]
+mainClassName = 'nebulae.lwjgl3.Lwjgl3Launcher'
+eclipse.project.name = appName + '-lwjgl3'
+sourceCompatibility = 1.8
+
+
+dependencies {
+//    api project(':core')
+    api "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+    api "com.badlogicgames.gdx:gdx-tools:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
+    api "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
+    api "com.badlogicgames.gdx:gdx-controllers-lwjgl3:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx:$gdxVersion"
+    api "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+    api "com.badlogicgames.gdx:gdx-ai:$aiVersion"
+    api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx-controllers:$gdxVersion"
+    api "com.sudoplay.joise:joise:$joiseVersion"
+    api "com.github.czyzby:gdx-kiwi:$kiwiVersion"
+    api "com.kotcrab.vis:vis-ui:$visUiVersion"
+    api "io.github.libktx:ktx-async:$ktxAsyncVersion"
+    api "io.github.libktx:ktx-style:$ktxStyleVersion"
+    api "io.github.libktx:ktx-collections:$ktxCollectionsVersion"
+    api "com.kotcrab.vis:vis-runtime:$visRuntimeVersion"
+    api "net.onedaybeard.artemis:artemis-odb:$artemisOdbVersion"
+    api "com.strongjoshua:libgdx-inGameConsole:$inGameConsoleVersion"
+    api "io.github.libktx:ktx-box2d:$ktxBox2dVersion"
+    api "io.github.libktx:ktx-scene2d:$ktxScene2DVersion"
+    api "io.github.libktx:ktx-i18n:$ktxI18nVersion"
+    api "io.github.libktx:ktx-log:$ktxLogVersion"
+    api "io.github.libktx:ktx-assets:$ktxAssetsVersion"
+    api "io.github.libktx:ktx-app:$ktxAppVersion"
+    api "io.github.libktx:ktx-math:$ktxMathVersion"
+    api "io.github.libktx:ktx-vis:$ktxVisVersion"
+    api "io.github.libktx:ktx-vis-style:$ktxVisStyleVersion"
+    api "io.github.libktx:ktx-actors:$ktxActorsVersion"
+    api "io.github.libktx:ktx-inject:$ktxInjectVersion"
+    compile project(':JHyphenator')
+    compile group: 'io.github.libktx', name: 'ktx-graphics', version: '1.9.10-b4'
+    compile "com.github.stuhlmeier:kotlin-events:v2.0"
+    compile "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
+    api group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-core', version: coroutinesVersion
+    implementation "space.earlygrey:shapedrawer:$shapedrawerVersion"
+    implementation "org.jetbrains.kotlin:kotlin-reflect:1.3.70"
+
+
+}
+
+import org.gradle.internal.os.OperatingSystem
+
+run {
+    workingDir = rootProject.file('assets').path
+    setIgnoreExitValue(true)
+
+    if (OperatingSystem.current() == OperatingSystem.MAC_OS) {
+        // Required to run LWJGL3 Java apps on MacOS
+        jvmArgs += "-XstartOnFirstThread"
+    }
+}
+jar {
+    archiveFileName = "${appName}-${version}.jar"
+    from { configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes 'Main-Class': project.mainClassName
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}

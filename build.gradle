@@ -1,0 +1,97 @@
+import com.badlogic.gdx.tools.texturepacker.TexturePacker
+import com.kotcrab.vis.usl.Main
+import org.ajoberstar.grgit.*;
+
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        google()
+        jcenter()
+    }
+    dependencies {
+        classpath "com.badlogicgames.gdx:gdx-tools:$gdxVersion"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath "com.kotcrab.vis:vis-usl:$uslVersion"
+        classpath "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+        classpath 'org.ajoberstar.grgit:grgit-core:4.0.2'
+    }
+}
+
+allprojects {
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+    ext {
+        shapedrawerVersion = '2.2.0'
+    }
+    repositories {
+        maven { url 'https://jitpack.io' }
+        mavenCentral()
+    }
+}
+
+configure(subprojects) {
+    apply plugin: 'java-library'
+    apply plugin: 'kotlin'
+    sourceCompatibility = 8.0
+    compileJava {
+        options.incremental = true
+    }
+}
+
+subprojects {
+    version = '0.0.1-SNAPSHOT'
+    ext.appName = 'Nebulae'
+    sourceCompatibility = 8.0
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+        maven { url 'https://jitpack.io' }
+        jcenter()
+    }
+}
+
+
+// Clearing Eclipse project nebulae.data in root folder:
+tasks.eclipse.doLast {
+    delete '.project'
+    delete '.classpath'
+    delete '.settings/'
+}
+
+// Run `gradle pack` task to generate skin.atlas file at assets/ui.
+
+task pack {
+    doLast {
+        TexturePacker.process(
+                file("raw/ui").absolutePath,
+                file("assets/ui").absolutePath,
+                "skin"
+        )
+    }
+}
+
+// Run `gradle compileSkin` task to generate skin.json at assets/ui.
+task compileSkin {
+    doLast {
+        // Convert USL skin file into JSON
+        String[] uslArgs = [
+                projectDir.path + '/raw/ui/skin.usl',         // Input USL file
+                projectDir.path + '/assets/ui/skin.json'    // Output JSON file
+        ]
+        Main.main(uslArgs)
+    }
+}
+// Run `gradle packAndCompileSkin` to generate skin atlas and compile USL into JSON
+task packAndCompileSkin(dependsOn: [pack, compileSkin])
+
+task cloneLibraryGitRepo() {
+    def destinationPath = projectDir.path + "/libs/jhyphenator"
+    def destination = file(destinationPath)
+    if (!destination.exists()) {
+        Grgit.clone(dir: destinationPath, uri: "https://github.com/mfietz/JHyphenator.git")
+    }
+}
