@@ -23,21 +23,16 @@ class UniverseGenerator(private val seed: Long = 123135464L) {
     val starCreated = event<List<Star>>()
     val galaxyUpdated = event<Star>()
 
-    var rand = Random(seed)
-    val noise = createModule()
-    var nameGenerator = MarkovGenerator(rand)
+    var farthestStarDistance = 0f
 
-    private fun createModule(): SeedableModule {
-        val base = ModuleFractal(ModuleFractal.FractalType.BILLOW, ModuleBasisFunction.BasisType.GRADVAL, ModuleBasisFunction.InterpolationType.QUINTIC)
-        base.seed = seed
-        return base;
-    }
+    var rand = Random(seed)
+    var nameGenerator = MarkovGenerator(rand)
 
     val octree: Octree = Octree(BoundingBox(Vector3(-1000f, -1000f, -1000f), Vector3(1000f, 1000f, 1000f)), 0)
     var galaxy: Galaxy? = null
 
-
     fun generate() {
+        farthestStarDistance = 0f
         octree.dispose()
         stars.clear()
         galaxy?.arms?.clear()
@@ -108,6 +103,10 @@ class UniverseGenerator(private val seed: Long = 123135464L) {
                         candidates[dist] = pos
                     }
                     val winner = candidates.minBy { it.key }!!.value
+                    val toCenter = winner.dst(Vector3.Zero)
+                    if (toCenter > farthestStarDistance) {
+                        farthestStarDistance = toCenter
+                    }
                     val spectralClass = SpectralClass.random(rand)
                     val temperature = rand.range(spectralClass.temperatureRange)
                     val luminosityClass = LuminosityClass.random(rand, spectralClass)

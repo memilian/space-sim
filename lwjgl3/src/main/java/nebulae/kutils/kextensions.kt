@@ -1,5 +1,6 @@
 package nebulae.kutils
 
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Vector3
 import java.util.*
@@ -85,4 +86,10 @@ fun Vector3.setZ(value: Float): Vector3 {
 
 fun Vector3.xy(): Vector2 {
     return Vector2(x, y)
+}
+
+
+fun Float.smoothstep(vmin: Float, vmax: Float): Float {
+    val x = MathUtils.clamp((this - vmin) / (vmax - vmin), 0f, 1f)
+    return x * x * (3 - 2 * x)
 }

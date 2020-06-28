@@ -4,19 +4,14 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.PerspectiveCamera
-import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g3d.Renderable
 import com.badlogic.gdx.graphics.g3d.utils.RenderContext
-import com.badlogic.gdx.math.Matrix4
-import com.badlogic.gdx.math.Quaternion
-import com.badlogic.gdx.math.Vector2
-import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.TimeUtils
 import nebulae.generation.Settings
 import kotlin.math.tan
 
 
-class NebulaeShaderSDF : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
+class NebulaeShaderSDF(zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
         "CAM_POS" to "u_CameraPosition",
         "CAM_DIR" to "u_CameraDirection",
         "CENTER" to "u_Center",
@@ -26,8 +21,11 @@ class NebulaeShaderSDF : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfn
         "FREQUENCY" to "u_Frequency",
         "AMPLITUDE" to "u_Amplitude",
         "PRIMARY_COLOR" to "u_PrimaryColor",
-        "SECONDARY_COLOR" to "u_SecondaryColor"
+        "SECONDARY_COLOR" to "u_SecondaryColor",
+        "ZONE_RADIUS" to "u_ZoneRadius"
 )) {
+
+    var zoneRadius: Float = 500f
 
     private var startTime = TimeUtils.millis();
 
@@ -49,6 +47,7 @@ class NebulaeShaderSDF : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfn
         program.setUniformf(locations["CAM_DIR"]!!, camera.direction)
         program.setUniformf(locations["CAM_POS"]!!, camera.position)
         program.setUniformf(locations["FACTOR"]!!, Settings.debug.factor)
+        program.setUniformf(locations["ZONE_RADIUS"]!!, zoneRadius)
         program.setUniformf(locations["AMPLITUDE"]!!, Settings.debug.amplitude)
         program.setUniformf(locations["FREQUENCY"]!!, Settings.debug.frequency)
         program.setUniformf(locations["PRIMARY_COLOR"]!!, Settings.graphics.primaryNebulaColor)

@@ -20,25 +20,11 @@ data class BoxData(val center: Vector3, val size: Float)
 class SkyboxShader : Shader {
 
     lateinit var program: ShaderProgram
-    private var projectionLoc = 0
     private var worldLoc = 0
-    private var viewLoc = 0
     private var viewProjLoc = 0
-    private var camPosLoc = 0
-    private var camDirLoc = 0
-    private var centerLoc = 0
-    private var sizeLoc = 0
-    private var resolutionLoc = 0
 
     private val WORLD = "u_World"
-    private val VIEW = "u_View"
-    private val PROJECTION = "u_Projection"
     private val VIEW_PROJECTION = "u_ViewProjection"
-    private val CAM_POS = "u_CameraPosition"
-    private val CAM_DIR = "u_CameraDirection"
-    private val CENTER = "u_Center"
-    private val SIZE = "u_Size"
-    private val RESOLUTION = "u_Resolution"
 
     private lateinit var camera: Camera
 
@@ -48,11 +34,7 @@ class SkyboxShader : Shader {
 #version 140
 in vec4 ${ShaderProgram.POSITION_ATTRIBUTE};
 uniform mat4 $WORLD;
-uniform mat4 $VIEW;
-uniform mat4 $PROJECTION;
 uniform mat4 $VIEW_PROJECTION;
-uniform vec3 $CAM_POS;
-uniform vec3 $CAM_DIR;
 
 out vec4 near;
 out vec4 far;
@@ -74,13 +56,6 @@ void main() {
 """
         val frag = """
 #version 140
-uniform vec2 $RESOLUTION;
-uniform vec3 $CAM_POS;
-uniform vec3 $CAM_DIR;
-uniform mat4 $WORLD;
-uniform mat4 $VIEW;
-uniform mat4 $PROJECTION;
-uniform mat4 $VIEW_PROJECTION;
 
 in vec4 near;
 in vec4 far;
@@ -104,9 +79,7 @@ float sphereTrace( vec3 ro, vec3 rd, out float den )
 
         // Here we compute our Position p by the formula RayOrigin + RayDirection * our RayMarchStep.
         vec3 p = ro + rd * t;
-//        if(length(p) > 1000.70){
-//            break;
-//        }
+
         // This is our density, it is simply calling the Fractional Brownian Motion fbm function.
         den = fbm( p );
 
@@ -125,8 +98,6 @@ float sphereTrace( vec3 ro, vec3 rd, out float den )
     return t;
 }
 
-//( in vec3 row, in vec3 rdw, in mat4 txx, in mat4 txi, in vec3 rad, 
-//                   out vec2 oT, out vec3 oN, out vec2 oU, out int oF ) 
 void main()
 {
     vec3 ro = near.xyz/near.w;  //ray's origin
@@ -141,24 +112,9 @@ void main()
     
     density = clamp(density, 0.0,  1.0);
     
-    vec3 viewpos = (vertexPos * $VIEW_PROJECTION).xyz;
-    
     fragColor = vec4(density);
-    
     fragColor.a = clamp(density, 0.0, 1.0);
-//    fragColor = heatMap(din, 0.0, 1.0);
 
-
-
-
-
-//    attenuate at the edge of sphere
-//    vec2 isect = sphereIntersect(mat3($WORLD) * (ro), rd, $CENTER, $SIZE * 0.9);
-//    vec3 iin = vertexPos.xyz + rd * isect.x;
-//    vec3 iout = vertexPos.xyz + rd * isect.y;
-//    vec3 diff = iin - iout;
-//    float din = length(diff * 0.6) / $SIZE;
-//    fragColor.a = clamp(density * din, 0.0, 1.0);
 }
 """
         ShaderProgram.pedantic = false
@@ -168,22 +124,12 @@ void main()
         }
 
         viewProjLoc = program.getUniformLocation(VIEW_PROJECTION)
-        projectionLoc = program.getUniformLocation(PROJECTION)
-        viewLoc = program.getUniformLocation(VIEW)
         worldLoc = program.getUniformLocation(WORLD)
-        camPosLoc = program.getUniformLocation(CAM_POS)
-        camDirLoc = program.getUniformLocation(CAM_DIR)
-        centerLoc = program.getUniformLocation(CENTER)
-        sizeLoc = program.getUniformLocation(SIZE)
-        resolutionLoc = program.getUniformLocation(RESOLUTION)
     }
 
     override fun render(renderable: Renderable) {
         renderable.meshPart.mesh.bind(program)
         program.setUniformMatrix(worldLoc, renderable.worldTransform)
-        val data = renderable.userData as BoxData
-        program.setUniformf(centerLoc, data.center)
-        program.setUniformf(sizeLoc, data.size)
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
 
@@ -197,18 +143,10 @@ void main()
         context.setBlending(true, GL40.GL_SRC_ALPHA, GL40.GL_ONE_MINUS_SRC_ALPHA)
         context.setCullFace(GL20.GL_FRONT)
         program.begin()
-        program.setUniformMatrix(projectionLoc, camera.projection)
-        program.setUniformMatrix(viewLoc, camera.view)
         program.setUniformMatrix(viewProjLoc, camera.combined)
-        program.setUniformf(camDirLoc, camera.direction)
-        program.setUniformf(camPosLoc, camera.position)
-        program.setUniformf(resolutionLoc, Vector2(camera.viewportWidth, camera.viewportHeight))
     }
 
     override fun end() {
-//        val intbuf = ByteBuffer.allocateDirect(16 * Integer.SIZE / 8).order(ByteOrder.nativeOrder()).asIntBuffer()
-//        Gdx.gl.glGetIntegerv(GL40.GL_MAX_VERTEX_UNIFORM_COMPONENTS, intbuf)
-//        println("" + intbuf.get() + " " + Gdx.gl.glGetError())
         program.end()
     }
 

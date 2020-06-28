@@ -3,7 +3,6 @@ package nebulae.generation
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import nebulae.screens.annotations.*
-import kotlin.reflect.KClass
 
 class Settings() {
 
@@ -41,7 +40,7 @@ class Settings() {
     class Generation {
         @WithDescription("Number of stars to generate")
         @Range(from = 10000f, to = 10_000_000f, step = 10000f)
-        var starCount = 100000
+        var starCount = 100_000
 
         @Range(from = 1f, to = 10f, step = 1f)
         var armCount = 3
@@ -53,16 +52,13 @@ class Settings() {
         var sampleCount = 5
 
         @Range(from = 100f, to = 10_000f, step = 10f)
-        var starPerPoint = 361
+        var starPerPoint = 400
 
         @Range(from = 10f, to = 100f, step = 1f)
         var wanderDistance = 35f
     }
 
     class Debug {
-
-        @Range(from = 10f, to = 200f, step = 1f)
-        var nebulaSize = 20f
 
         @Range(from = 0f, to = 5f, step = 0.005f)
         var factor = 0.45f;
@@ -80,13 +76,7 @@ class Settings() {
         var drawStars = true
 
         @Check
-        var drawNebulaes = false
-
-        @Check
-        var drawNebulaesSDF = true
-
-        @Check()
-        var showArms = false
+        var drawNebulaes = true
 
         @Check()
         var drawIntersection = false

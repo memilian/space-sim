@@ -7,7 +7,6 @@ import com.badlogic.gdx.math.collision.Ray
 import com.badlogic.gdx.utils.Disposable
 import ktx.math.times
 import nebulae.kutils.minus
-import nebulae.kutils.plus
 
 /*
 //Octree: Octants numbering
@@ -58,7 +57,7 @@ class Octree(val bounds: BoundingBox, val depth: Int = 0, val parent: Octree? = 
 
     val objects = mutableMapOf<String, MutableList<*>>()
 
-    fun <T : BaseObject> insert(obj: T) {
+    fun <T : GameObject> insert(obj: T) {
         if (!bounds.contains(obj.boundingBox)) {
             throw IllegalStateException("Cannot insert out of bounds object $obj")
         }
@@ -75,7 +74,7 @@ class Octree(val bounds: BoundingBox, val depth: Int = 0, val parent: Octree? = 
         val type: String = obj::class.java.simpleName
 
         @Suppress("UNCHECKED_CAST")
-        var typedList: MutableList<BaseObject>? = objects[type] as MutableList<BaseObject>?
+        var typedList: MutableList<GameObject>? = objects[type] as MutableList<GameObject>?
         if (typedList == null) {
             typedList = mutableListOf()
             objects[type] = typedList
@@ -84,7 +83,7 @@ class Octree(val bounds: BoundingBox, val depth: Int = 0, val parent: Octree? = 
 
         if (isLeaf && typedList.size > MAX_OBJECT && depth < MAX_DEPTH) {
             subdivide()
-            val elements = mutableListOf<BaseObject>()
+            val elements = mutableListOf<GameObject>()
             elements.addAll(typedList)
             typedList.clear()
             elements.forEach {
@@ -126,7 +125,7 @@ class Octree(val bounds: BoundingBox, val depth: Int = 0, val parent: Octree? = 
         }
     }
 
-    private fun <T : BaseObject> getIndex(obj: T): Int {
+    private fun <T : GameObject> getIndex(obj: T): Int {
         for ((index, child) in children!!.withIndex()) {
             if (child.bounds.contains(obj.boundingBox)) {
                 return index

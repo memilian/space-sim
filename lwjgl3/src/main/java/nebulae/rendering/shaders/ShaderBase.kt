@@ -58,7 +58,7 @@ abstract class ShaderBase : Shader {
 
 
     override fun init() {
-
+        disposeSafely()
         var vert = Gdx.files.internal(vertPath.toString()).readString()
         var frag = Gdx.files.internal(fragPath.toString()).readString()
 

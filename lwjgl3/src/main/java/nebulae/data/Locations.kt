@@ -9,18 +9,18 @@ import nebulae.kutils.component2
 import nebulae.kutils.v2
 
 
-open class BaseObject(open val boundingBox: BoundingBox, val position: Vector3) {
+open class GameObject(open val boundingBox: BoundingBox, val position: Vector3) {
 }
 
 data class Galaxy(val name: String, var sectors: List<Sector>, var arms: MutableList<List<Vector2>>)
 
-data class Sector(override val boundingBox: BoundingBox, val name: String) : BaseObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
+data class Sector(override val boundingBox: BoundingBox, val name: String) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
 
-data class StarSystem(override val boundingBox: BoundingBox) : BaseObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
+data class StarSystem(override val boundingBox: BoundingBox) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
 
-data class Planet(override val boundingBox: BoundingBox, val name: String, val type: PlanetType) : BaseObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
+data class Planet(override val boundingBox: BoundingBox, val name: String, val type: PlanetType) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
 
-data class Star(override val boundingBox: BoundingBox, val name: String, val type: StarType) : BaseObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
+data class Star(override val boundingBox: BoundingBox, val name: String, val type: StarType) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
 
 data class StarType(val spectralClass: SpectralClass, val luminosityClass: LuminosityClass, val temperature: Float, val subClass: Int) {
     override fun toString(): String {

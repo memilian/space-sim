@@ -3,6 +3,7 @@ uniform float SIZE;
 uniform float FACTOR;
 uniform float FREQUENCY;
 uniform float AMPLITUDE;
+uniform float ZONE_RADIUS;
 uniform vec3 CENTER;
 uniform vec2 RESOLUTION;
 uniform vec3 CAM_POS;
@@ -43,7 +44,7 @@ float fbm(in vec3 p)
     #define STEPS 10
     #define FAR 25
     #define DELTA_STEP 2.5
-DensityInfo accumulate(vec3 rd, vec3 pos, float maxDist, float steps, float deltaStep){
+DensityInfo accumulate(vec3 rd, vec3 pos, float steps, float deltaStep){
     DensityInfo result = DensityInfo(0.0, 0.0);
     vec3 cur = vec3(pos);
     float i = 0.0;
@@ -64,7 +65,7 @@ DensityInfo accumulate(vec3 rd, vec3 pos, float maxDist, float steps, float delt
 }
 
 DensityInfo accumulate(vec3 rd, vec3 p){
-    return accumulate(rd, p, FAR, STEPS, DELTA_STEP);
+    return accumulate(rd, p, STEPS, DELTA_STEP);
 }
 
 float accumulateVor(vec3 rd, vec3 pos, float scale){
@@ -147,7 +148,7 @@ void traceScene(Ray ray)
     for (int i = 0; i < 256; i++){
 
         vec3 pos = ray.o + dist * ray.d;
-        float t = sdCylinder(pos, vec3(0, 0, -10), vec3(0, 0, topLimit), 500);
+        float t = sdCylinder(pos, vec3(0, 0, -10), vec3(0, 0, topLimit), ZONE_RADIUS);
         if (t < 1.0){
             float toCenter = length(pos);
             if (ray.o.z < topLimit){
@@ -155,7 +156,7 @@ void traceScene(Ray ray)
             }
             usedPos = pos;
 
-            DensityInfo di = accumulate(ray.d, pos, 250.0, 25.0, 1.0);
+            DensityInfo di = accumulate(ray.d, pos, 25.0, 1.0);
 
             //float vor = accumulateVor(ray.d, pos, 10.0);
             float density = pow(di.density * 1.0, 0.5);
@@ -182,7 +183,7 @@ void traceScene(Ray ray)
             */
             col.rgb *= mix(PRIMARY_COLOR.rgb, SECONDARY_COLOR.rgb, min(max(0.0, di.material), 1.0));
 
-            col.a *= 1 - smoothstep(400., 500., toCenter);
+            col.a *= 1 - smoothstep(ZONE_RADIUS - 100.0, ZONE_RADIUS, toCenter);
 
             break;
         }

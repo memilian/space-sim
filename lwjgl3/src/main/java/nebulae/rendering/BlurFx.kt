@@ -85,8 +85,8 @@ void main() {
     var pongBuffer: FrameBuffer? = null
     var fboRegion: TextureRegion? = null
 
-    val FBO_WIDTH = baseWidth
-    val FBO_HEIGHT = baseHeight
+    private val FBO_WIDTH = baseWidth
+    private val FBO_HEIGHT = baseHeight
 
     init {
         initialize()
