@@ -15,7 +15,7 @@ import nebulae.data.Octree
 import nebulae.generation.Settings
 import org.lwjgl.opengl.GL40
 
-class OctreeRenderer(private val nodeList: MutableList<Octree>, private val camera: Camera, private val modelBatch: ModelBatch) : IRenderer {
+class OctreeRenderer(private val nodeList: MutableList<Octree>, private val modelBatch: ModelBatch) : IRenderer {
 
     private val boxes = mutableListOf<ModelInstance>()
 
@@ -34,7 +34,7 @@ class OctreeRenderer(private val nodeList: MutableList<Octree>, private val came
     }
 
     private val tmp = Vector3()
-    override fun renderToScreen() {
+    override fun renderToScreen(camera: Camera) {
         if (!Settings.debug.drawIntersection) {
             return
         }

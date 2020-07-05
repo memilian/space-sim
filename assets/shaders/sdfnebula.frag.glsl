@@ -193,7 +193,6 @@ void traceScene(Ray ray)
     //    vec4 col = 1.3 * traceSphere(ray, vec3(0.), 20., 15.0);
 
     fragColor = col * 1.3;
-
 }
 
 
@@ -207,6 +206,4 @@ void main()
 
 
     traceScene(ray);
-    grid(rd, 0.05);
-
 }

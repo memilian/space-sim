@@ -38,13 +38,14 @@ class NebulaeRenderer(private val spriteBatch: SpriteBatch, private val orthoCam
         screenQuad = ModelInstance(quad)
     }
 
-    override fun renderToFramebuffer() {
+    override fun renderToFramebuffer(camera: Camera) {
         if (Settings.debug.drawNebulaes) {
             framebufferNebulaes.use {
+                orthoCam.setToOrtho(false, framebufferNebulaes.width.toFloat(), framebufferNebulaes.height.toFloat())
+                orthoCam.update()
+                spriteBatch.projectionMatrix = orthoCam.combined
                 spriteBatch.use {
-                    orthoCam.setToOrtho(false, framebufferNebulaes.width.toFloat(), framebufferNebulaes.height.toFloat())
-                    orthoCam.update()
-                    spriteBatch.projectionMatrix = orthoCam.combined
+
                     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
                     modelBatch.begin(camera)
@@ -57,7 +58,7 @@ class NebulaeRenderer(private val spriteBatch: SpriteBatch, private val orthoCam
         }
     }
 
-    override fun renderToScreen() {
+    override fun renderToScreen(camera: Camera) {
         if (Settings.debug.drawNebulaes) {
             spriteBatch.use {
                 it.enableBlending()

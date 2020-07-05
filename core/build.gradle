@@ -2,7 +2,6 @@
 eclipse.project.name = appName + '-core'
 sourceCompatibility = 1.8
 
-
 dependencies {
 //    api "com.badlogicgames.gdx:gdx:$gdxVersion"
 //    api "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"

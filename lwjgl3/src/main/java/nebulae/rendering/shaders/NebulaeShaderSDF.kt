@@ -42,10 +42,9 @@ class NebulaeShaderSDF(zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.g
     override fun begin(cam: Camera, context: RenderContext) {
         super.begin(cam, context)
 
-        val camera = cam as PerspectiveCamera
 //        context.setBlending(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        program.setUniformf(locations["CAM_DIR"]!!, camera.direction)
-        program.setUniformf(locations["CAM_POS"]!!, camera.position)
+        program.setUniformf(locations["CAM_DIR"]!!, cam.direction)
+        program.setUniformf(locations["CAM_POS"]!!, cam.position)
         program.setUniformf(locations["FACTOR"]!!, Settings.debug.factor)
         program.setUniformf(locations["ZONE_RADIUS"]!!, zoneRadius)
         program.setUniformf(locations["AMPLITUDE"]!!, Settings.debug.amplitude)

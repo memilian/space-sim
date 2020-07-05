@@ -1,5 +1,6 @@
 package nebulae.rendering.renderers
 
+import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.utils.Disposable
 
 interface IRenderer : Disposable {
@@ -10,7 +11,7 @@ interface IRenderer : Disposable {
         }
     }
 
-    fun renderToFramebuffer() {}
+    fun renderToFramebuffer(camera: Camera) {}
 
-    fun renderToScreen()
+    fun renderToScreen(camera: Camera)
 }

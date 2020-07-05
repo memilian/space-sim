@@ -13,7 +13,7 @@ import org.lwjgl.opengl.GL40
 import java.lang.Integer.min
 import kotlin.math.floor
 
-class FixedStarBatch(private val camera: Camera) : Disposable {
+class FixedStarBatch() : Disposable {
     private var meshes = mutableListOf<Mesh>()
     private var shader: ShaderProgram? = null
     private var size = 0;
@@ -47,7 +47,7 @@ class FixedStarBatch(private val camera: Camera) : Disposable {
         println("Created ${meshes.size} meshes for ${decals.size} decals")
     }
 
-    fun render() {
+    fun render(camera: Camera) {
         if (shader != null && meshes.isNotEmpty()) {
             Gdx.gl.glEnable(GL20.GL_BLEND)
             Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)

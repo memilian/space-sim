@@ -19,7 +19,8 @@ import kotlin.math.*
 class BoundedCameraInputController(private val camera: Camera, var bounds: Rectangle) : InputAdapter() {
 
 
-    public var target = Vector3()
+    private val restrictPitch = false
+    var target = Vector3()
     var desiredTarget: Vector3? = null
         set(value) {
             timer = 0f
@@ -91,7 +92,7 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
             val pitch = MathUtils.radiansToDegrees * atan2(abs(tmp2.y), tmp2.z)
             var deltaRotation = desiredPitch * delta
             val futurePitch = deltaRotation + pitch
-            if (futurePitch < 95) {
+            if (futurePitch < 95 && restrictPitch) {
                 if (pitch < 90) {
                     deltaRotation = pitch - 90.10f
                 }

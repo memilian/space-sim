@@ -10,12 +10,15 @@ import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.decals.CameraGroupStrategy
 import com.badlogic.gdx.graphics.g3d.decals.DecalBatch
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
+import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.math.*
 import com.badlogic.gdx.math.collision.Ray
 import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack
+import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.TimeUtils
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.kotcrab.vis.ui.widget.VisWindow
+import ktx.app.use
 import ktx.assets.disposeSafely
 import ktx.math.times
 import nebulae.data.Octree
@@ -24,12 +27,15 @@ import nebulae.generation.Settings
 import nebulae.generation.UniverseGenerator
 import nebulae.input.BoundedCameraInputController
 import nebulae.kutils.BufferedList
+import nebulae.kutils.PNG
 import nebulae.kutils.minus
 import nebulae.rendering.*
 import nebulae.rendering.renderers.*
 import nebulae.selection.Selection
 import nebulae.universe.Universe
+import org.lwjgl.opengl.GL40
 import space.earlygrey.shapedrawer.ShapeDrawer
+import java.util.Arrays.asList
 
 
 class GenerationScene(private val generator: UniverseGenerator, val universe: Universe) : VisWindow("") {
@@ -38,24 +44,27 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
     private val fontCloseness = BitmapFont(Gdx.files.internal("fonts/closeness.fnt"), true)
     private val fontDiscognate = BitmapFont(Gdx.files.internal("fonts/discognate.fnt"), true)
     private val fontSpartakus = BitmapFont(Gdx.files.internal("fonts/spartakus.fnt"), true)
-
     private var needsResize = false
     private val camera = PerspectiveCamera(67f, 1366f, 768f)
+
     private val orthoCamera = OrthographicCamera(1366f, 768f)
+    private val orthoCam = OrthographicCamera()
     private val viewportScreen = ScreenViewport(camera)
     private val starTexture = TextureRegion(Texture(Gdx.files.internal("textures/star.png")))
     private val starTexturePre = TextureRegion(Texture(Gdx.files.internal("textures/star_pre.png")))
     private val pixelTexture = TextureRegion(Texture(Gdx.files.internal("textures/pixel.png")))
 
-    private val ringTexture = TextureRegion(Texture(Gdx.files.internal("textures/ring_pre.png")))
+    private val SKYBOX_SIZE = 1024f;
+    private var skyboxTextures = mutableListOf<TextureRegion>()
+    private var skyboxNeedsUpdate = false
+
     private val decalBatch = DecalBatch(100, CameraGroupStrategy(camera))
-    private val fixedBatch = FixedStarBatch(camera)
+    private val fixedBatch = FixedStarBatch()
     private val modelBatch = ModelBatch()
 
     private val builder = ModelBuilder()
     private val polygonSpriteBatch = PolygonSpriteBatch()
     private val spriteBatch = SpriteBatch()
-    private val shape = ShapeDrawer(polygonSpriteBatch, pixelTexture)
     private val cameraInputController = BoundedCameraInputController(camera, Rectangle())
     private val multiplexer: InputMultiplexer by lazy { InputMultiplexer(stage, cameraInputController) }
     private val stars = BufferedList<StarDecal>()
@@ -66,11 +75,10 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
     private val focusedNeighbors = mutableListOf<Star>()
     private val focusedNeighborsConnections = mutableListOf<ModelInstance>()
 
-    private val orthoCam = OrthographicCamera()
-
     private var nebulaeRenderer: NebulaeRenderer? = null
     private var skyboxRenderer: SkyboxRenderer? = null
     private var starfieldRenderer: StarFieldRenderer? = null
+    private var starfieldRendererForSkybox: StarFieldRenderer? = null
     private var octreeRenderer: OctreeRenderer? = null
     private var starRenderer: StarRenderer? = null
     private var selectionRenderer: SelectionRenderer? = null
@@ -79,6 +87,8 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 
     private val tmp = Vector3()
     private val tmp2 = Vector3()
+
+    private var viewMode = ViewMode.GALAXY
 
     init {
         initialize()
@@ -107,10 +117,11 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
             fixedBatch.set(stars)
 
             nebulaeRenderer = NebulaeRenderer(spriteBatch, orthoCam, modelBatch, camera, generator.farthestStarDistance)
-            skyboxRenderer = SkyboxRenderer(modelBatch, camera)
+            skyboxRenderer = SkyboxRenderer(modelBatch)
             starfieldRenderer = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, width, height)
-            octreeRenderer = OctreeRenderer(intersectingNodes, camera, modelBatch)
-            starRenderer = StarRenderer(modelBatch, camera)
+            starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, SKYBOX_SIZE, SKYBOX_SIZE)
+            octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
+            starRenderer = StarRenderer(modelBatch)
             selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
         }
 
@@ -120,6 +131,8 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         nebulaeRenderer?.init()
         starfieldRenderer?.disposeSafely()
         starfieldRenderer?.init()
+        starfieldRendererForSkybox?.disposeSafely()
+        starfieldRendererForSkybox?.init()
         octreeRenderer?.disposeSafely()
         octreeRenderer?.init()
         selectionRenderer?.disposeSafely()
@@ -140,8 +153,14 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 
         stage.viewport.apply()
 
-        starfieldRenderer!!.renderToFramebuffer()
-        nebulaeRenderer!!.renderToFramebuffer()
+        if (skyboxNeedsUpdate) {
+            renderSystemSkybox(focusedSelection!!.item)
+            skyboxRenderer!!.textures = skyboxTextures
+            skyboxNeedsUpdate = false
+        }
+
+        starfieldRenderer!!.renderToFramebuffer(camera)
+        nebulaeRenderer!!.renderToFramebuffer(camera)
 
         beginScene()
 
@@ -149,16 +168,21 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         Gdx.gl.glClearColor(col, col, col, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
-        skyboxRenderer!!.renderToScreen()
-        starfieldRenderer!!.renderToScreen()
-        nebulaeRenderer!!.renderToScreen()
-        selectionRenderer!!.renderToScreen()
+        if (viewMode == ViewMode.GALAXY) {
+            starfieldRenderer!!.renderToScreen(camera)
+            nebulaeRenderer!!.renderToScreen(camera)
+            selectionRenderer!!.renderToScreen(camera)
+        } else {
+            skyboxRenderer!!.renderToScreen(camera)
+        }
 
         starRenderer!!.starSelection = focusedSelection
-        starRenderer!!.renderToScreen()
+        starRenderer!!.viewMode = viewMode
+        starRenderer!!.renderToScreen(camera)
 
-        octreeRenderer!!.renderToScreen()
-
+        if (viewMode == ViewMode.GALAXY) {
+            octreeRenderer!!.renderToScreen(camera)
+        }
         endScene(_batch)
     }
 
@@ -168,6 +192,15 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 
         if (focusedSelection != null) {
             focusedSelection!!.selectionTimer += delta.toLong()
+            val dst = camera.position.dst(focusedSelection!!.item.position)
+            if (dst < 4f && viewMode == ViewMode.GALAXY) {
+                println("switch view mode to SYSTEM")
+                viewMode = ViewMode.SYSTEM
+                skyboxNeedsUpdate = true
+            } else if (dst > 100f && viewMode == ViewMode.SYSTEM) {
+                viewMode = ViewMode.GALAXY
+                println("switch view mode to GALAXY")
+            }
         }
         if (hoveredSelection != null) {
             hoveredSelection!!.selectionTimer += delta.toLong()
@@ -257,9 +290,70 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         }
     }
 
+    private val fbs = mutableListOf<FrameBuffer>()
+
+    init {
+        for (i in 0 until 6) {
+            fbs.add(FrameBuffer(Pixmap.Format.RGBA8888, SKYBOX_SIZE.toInt(), SKYBOX_SIZE.toInt(), false))
+        }
+    }
+
+    private fun renderSystemSkybox(star: Star) {
+        val cam = PerspectiveCamera(90f, SKYBOX_SIZE, SKYBOX_SIZE);
+        cam.position.set(star.position)
+        cam.update()
+        val directions = listOf(
+                Vector3.Z.cpy().times(-1),
+                Vector3.Z,
+                Vector3.Y.cpy().times(-1),
+                Vector3.Y,
+                Vector3.X.cpy().times(-1),
+                Vector3.X
+        )
+///// uncomment the 3 blocks to draw buffer number on textures
+//        val sb = SpriteBatch()
+//        val oc = OrthographicCamera()
+        for ((i, dir) in directions.withIndex()) {
+            cam.direction.set(dir)
+            cam.up.set(when (dir.z) {
+                1f -> Vector3.X
+                -1f -> Vector3.X.cpy().times(-1)
+                else -> Vector3.Z
+            })
+            cam.update()
+            starfieldRendererForSkybox!!.renderToFramebuffer(cam)
+            nebulaeRenderer!!.renderToFramebuffer(cam)
+//            oc.setToOrtho(true, fbs[i].width.toFloat(), fbs[i].height.toFloat())
+//            oc.update()
+//            sb.projectionMatrix = oc.combined
+//            sb.color = Color.WHITE
+            fbs[i].begin()
+            Gdx.gl20.glClearColor(0f, 0f, 0f, 0f)
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+            starfieldRendererForSkybox!!.renderToScreen(cam)
+            nebulaeRenderer!!.renderToScreen(cam)
+
+//            sb.use {
+//                val scale = 0.5f
+//                fontAndromeda.data.scaleX = scale
+//                fontAndromeda.data.scaleY = scale
+//                fontAndromeda.draw(sb, "buffer $i", 0f, 512f, 1024f, Align.center, true)
+//            }
+            fbs[i].end()
+        }
+        if (skyboxTextures.isEmpty()) {
+            for (fb in fbs) {
+                val region = TextureRegion(fb.colorBufferTexture)
+                region.flip(true, true)
+                skyboxTextures.add(region);
+            }
+        }
+    }
+
     override fun remove(): Boolean {
         nebulaeRenderer.disposeSafely()
         starfieldRenderer.disposeSafely()
+        starfieldRendererForSkybox.disposeSafely()
         skyboxRenderer.disposeSafely()
         selectionRenderer.disposeSafely()
 
@@ -340,4 +434,9 @@ class StarDecal(val star: Star, val size: Float) {
         vertices[2] = star.position.z
         vertices[3] = star.type.temperature
     }
+}
+
+enum class ViewMode {
+    GALAXY,
+    SYSTEM
 }

@@ -1,5 +1,6 @@
 package nebulae.rendering.renderers
 
+import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
@@ -30,14 +31,15 @@ class StarFieldRenderer(private val polygonSpriteBatch: PolygonSpriteBatch, priv
         originalScene!!.flip(false, true)
     }
 
-    override fun renderToFramebuffer() {
+    override fun renderToFramebuffer(camera: Camera) {
         blurredScene = blur!!.renderToTexture {
-            fixedBatch.render()
+            fixedBatch.render(camera)
         }
     }
 
-    override fun renderToScreen() {
+    override fun renderToScreen(camera: Camera) {
         if (Settings.debug.drawStars) {
+
             polygonSpriteBatch.projectionMatrix = orthoCamera.combined
             polygonSpriteBatch.use {
                 it.enableBlending()

@@ -70,7 +70,7 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
         ringTexture = TextureRegion(Texture(Gdx.files.internal("textures/ring_pre.png")))
     }
 
-    override fun renderToScreen() {
+    override fun renderToScreen(camera: Camera) {
         if (hoveredSelection != null) {
             Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
             val decal = hoveredDecal

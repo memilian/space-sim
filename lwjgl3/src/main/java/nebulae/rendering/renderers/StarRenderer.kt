@@ -13,11 +13,13 @@ import ktx.assets.disposeSafely
 import nebulae.data.Star
 import nebulae.kutils.smoothstep
 import nebulae.rendering.shaders.StarShader
+import nebulae.screens.ViewMode
 import nebulae.selection.Selection
 import kotlin.math.min
 
-class StarRenderer(private val modelBatch: ModelBatch, private val camera: Camera) : IRenderer {
+class StarRenderer(private val modelBatch: ModelBatch) : IRenderer {
 
+    lateinit var viewMode: ViewMode
     var starSelection: Selection<Star>? = null
         set(value) {
             field = value
@@ -41,14 +43,17 @@ class StarRenderer(private val modelBatch: ModelBatch, private val camera: Camer
         starModelInstance = ModelInstance(starModel)
     }
 
-    override fun renderToScreen() {
+    override fun renderToScreen(camera: Camera) {
         if (starSelection == null) {
             return
         }
         modelBatch.begin(camera)
         val starPos = starSelection!!.item.position
         val dst = tmp.set(starPos).dst(camera.position)
-        val scale = 0.82f * min(dst.smoothstep(10f, 5f), TimeUtils.timeSinceMillis(starSelection!!.selectionTimer).toFloat().smoothstep(0f, 500f))
+        val scale = when (viewMode) {
+            ViewMode.GALAXY -> 0.82f * min(dst.smoothstep(10f, 5f), TimeUtils.timeSinceMillis(starSelection!!.selectionTimer).toFloat().smoothstep(0f, 500f))
+            ViewMode.SYSTEM -> 2.0f
+        }
         starModelInstance?.transform = tmpMat.idt().translate(starPos).scale(scale, scale, scale)
         modelBatch.render(starModelInstance, starShader)
         modelBatch.end()
