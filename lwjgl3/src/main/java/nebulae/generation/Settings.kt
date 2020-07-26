@@ -70,9 +70,6 @@ class Settings() {
         var amplitude = 1f;
 
         @Check
-        var drawNeighbors = true
-
-        @Check
         var drawStars = true
 
         @Check
@@ -82,10 +79,12 @@ class Settings() {
         var drawIntersection = false
 
         @Check()
-        var drawSkybox = false
+        var drawSkybox = true
 
         @Check()
         var autoRotate = false
+
+
 /*
         @EnumList<BlendFactor>()
         var srcFactor = BlendFactor.SRC_ALPHA

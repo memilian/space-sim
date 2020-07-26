@@ -245,7 +245,7 @@ class Octree(val bounds: BoundingBox, val depth: Int = 0, val parent: Octree? = 
 
     val emptyResult = mutableListOf<Any>()
     inline fun <reified T> getObjects(): List<T> {
-        return objects.getOrDefault(T::class.java.simpleName, emptyResult as MutableList<T>) as List<T>
+        return objects.getOrDefault(T::class.java.simpleName, emptyResult as MutableList<*>) as List<T>
     }
 
 }

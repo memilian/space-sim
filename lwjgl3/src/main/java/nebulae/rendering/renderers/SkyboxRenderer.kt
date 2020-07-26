@@ -47,7 +47,7 @@ class SkyboxRenderer(private val modelBatch: ModelBatch) : IRenderer {
             boxMesh.getIndices(0, 6, indices, 0)
             quad.setIndices(indices)
             modelBuilder.part("quad", quad, GL20.GL_TRIANGLES, material)
-            quads.add(ModelInstance(modelBuilder.end(), Matrix4().scale(500f, 500f, 500f)))
+            quads.add(ModelInstance(modelBuilder.end(), Matrix4().idt()))
         }
         box.dispose()
     }
@@ -68,7 +68,7 @@ class SkyboxRenderer(private val modelBatch: ModelBatch) : IRenderer {
             Gdx.gl.glClearColor(0f, 0f, 0f, 0f)
             Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT or GL20.GL_COLOR_BUFFER_BIT)
             val pos = camera.position
-            val world = tmpMat.idt().setToTranslationAndScaling(pos.x, pos.y, pos.z, 2500f, 2500f, 2500f)
+            val world = tmpMat.idt().setToTranslationAndScaling(pos.x, pos.y, pos.z, 5500f, 5500f, 5500f)
             for (i in 0 until 6) {
                 val quad = quads[i]
                 val texture = textures!![i]

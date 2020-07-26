@@ -7,18 +7,17 @@ import com.badlogic.gdx.utils.Align
 import com.kotcrab.vis.ui.VisUI
 import ktx.actors.onClick
 import ktx.log.logger
-import ktx.scene2d.scrollPane
 import ktx.vis.KVisWindow
 import ktx.vis.window
 import nebulae.Nebulae
 import nebulae.generation.Settings
-import nebulae.generation.UniverseGenerator
+import nebulae.generation.GalaxyGenerator
 import nebulae.screens.annotations.AnnotationProcessor
 import nebulae.universe.Universe
 
 private val log = logger<GenerationScreen>()
 
-class GenerationScreen(private val game: Nebulae, private val generator: UniverseGenerator, private val universe: Universe) : VisUIScreen(game) {
+class GenerationScreen(private val game: Nebulae, private val generator: GalaxyGenerator, private val universe: Universe) : VisUIScreen() {
 
     private var window: KVisWindow? = null
     private var scene: GenerationScene = GenerationScene(generator, universe)
@@ -28,7 +27,7 @@ class GenerationScreen(private val game: Nebulae, private val generator: Univers
         initialize()
     }
 
-    fun initialize() {
+    private fun initialize() {
         stage.addActor(window("Generation") {
             window = this
             setSize(LEFT_PANE_WIDTH, height)

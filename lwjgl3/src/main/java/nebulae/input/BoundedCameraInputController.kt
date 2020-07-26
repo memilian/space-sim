@@ -60,6 +60,11 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
 
     private var distanceFactor = 1.0f
     private var timer = 0f
+    private val timeToFocusTarget = 2f;
+
+    fun isMovingToTarget(): Boolean {
+        return timer < timeToFocusTarget;
+    }
 
     fun update() {
         updateDistanceFactor()
@@ -134,7 +139,7 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
 
         if (desiredTarget != null) {
             val toTarget = (tmp1.set(desiredTarget) - target)
-            val progress = Interpolation.smoother.apply(min(1f, timer / 2f))
+            val progress = Interpolation.smoother.apply(min(1f, timer / timeToFocusTarget))
             if (toTarget.len2() < 0.000001f) {
                 desiredTarget = null
             }

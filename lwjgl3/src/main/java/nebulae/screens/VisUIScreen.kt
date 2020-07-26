@@ -7,7 +7,7 @@ import ktx.app.KtxScreen
 import nebulae.Nebulae
 import kotlin.math.min
 
-open class VisUIScreen(game: Nebulae) : KtxScreen {
+open class VisUIScreen() : KtxScreen {
     protected var stage: Stage = Stage(ScreenViewport())
 
     override fun show() {

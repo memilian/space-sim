@@ -32,14 +32,14 @@ import kotlin.math.pow
 
 class SelectionRenderer(private val camera: Camera, private val orthoCam: OrthographicCamera, private val decalBatch: DecalBatch, private val modelBatch: ModelBatch, private val font: BitmapFont) : IRenderer {
 
-    var hoveredSelection: Selection<Star>? = null
+    var hoveredSelection: Selection<GameObject>? = null
         set(value) {
             field = value
             if (value != null) {
                 hoveredTextDecal = createTextDecal(hoveredFb, hoveredTextDecal, value.item.name)
             }
         }
-    var focusedSelection: Selection<Star>? = null
+    var focusedSelection: Selection<GameObject>? = null
         set(value) {
             field = value
             if (value != null) {
@@ -71,8 +71,7 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
     }
 
     override fun renderToScreen(camera: Camera) {
-        if (hoveredSelection != null) {
-            Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
+        if (hoveredSelection != null && focusedSelection?.item != hoveredSelection!!.item) {
             val decal = hoveredDecal
             val starPosition = hoveredSelection!!.item.position
             decal.position = starPosition
@@ -120,12 +119,16 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
                    Gdx.gl.glDisable(GL40.GL_LINE_SMOOTH)
                }*/
         }
+        Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl20.glDepthMask(false)
         decalBatch.flush()
+        Gdx.gl20.glDisable(GL20.GL_DEPTH_TEST)
+        Gdx.gl20.glDepthMask(true)
     }
 
     private fun drawTextDecal(it: Decal, scale: Float) {
         it.lookAt(camera.position, camera.up)
-        it.setBlending(GL40.GL_ONE, GL40.GL_ONE)
+        it.setBlending(GL40.GL_ONE, GL40.GL_ONE_MINUS_SRC_ALPHA)
         it.color = Color.WHITE
         it.setDimensions(8f * scale, 2f * scale)
         decalBatch.add(it)

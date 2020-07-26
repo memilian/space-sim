@@ -11,7 +11,7 @@ import nebulae.generation.Settings
 import kotlin.math.tan
 
 
-class NebulaeShaderSDF(zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
+class NebulaeShaderSDF(var zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
         "CAM_POS" to "u_CameraPosition",
         "CAM_DIR" to "u_CameraDirection",
         "CENTER" to "u_Center",
@@ -25,10 +25,6 @@ class NebulaeShaderSDF(zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.g
         "ZONE_RADIUS" to "u_ZoneRadius"
 )) {
 
-    var zoneRadius: Float = 500f
-
-    private var startTime = TimeUtils.millis();
-
     override fun render(renderable: Renderable) {
         super.render(renderable)
         Gdx.gl.glEnable(GL20.GL_BLEND)
@@ -39,12 +35,12 @@ class NebulaeShaderSDF(zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.g
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
     }
 
-    override fun begin(cam: Camera, context: RenderContext) {
-        super.begin(cam, context)
+    override fun begin(camera: Camera, context: RenderContext) {
+        super.begin(camera, context)
 
 //        context.setBlending(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        program.setUniformf(locations["CAM_DIR"]!!, cam.direction)
-        program.setUniformf(locations["CAM_POS"]!!, cam.position)
+        program.setUniformf(locations["CAM_DIR"]!!, camera.direction)
+        program.setUniformf(locations["CAM_POS"]!!, camera.position)
         program.setUniformf(locations["FACTOR"]!!, Settings.debug.factor)
         program.setUniformf(locations["ZONE_RADIUS"]!!, zoneRadius)
         program.setUniformf(locations["AMPLITUDE"]!!, Settings.debug.amplitude)

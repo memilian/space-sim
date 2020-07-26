@@ -14,31 +14,27 @@ import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.math.*
 import com.badlogic.gdx.math.collision.Ray
 import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack
-import com.badlogic.gdx.utils.Align
-import com.badlogic.gdx.utils.TimeUtils
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.kotcrab.vis.ui.widget.VisWindow
-import ktx.app.use
 import ktx.assets.disposeSafely
 import ktx.math.times
+import nebulae.data.GameObject
 import nebulae.data.Octree
 import nebulae.data.Star
+import nebulae.data.System
 import nebulae.generation.Settings
-import nebulae.generation.UniverseGenerator
+import nebulae.generation.GalaxyGenerator
 import nebulae.input.BoundedCameraInputController
 import nebulae.kutils.BufferedList
-import nebulae.kutils.PNG
 import nebulae.kutils.minus
 import nebulae.rendering.*
 import nebulae.rendering.renderers.*
 import nebulae.selection.Selection
 import nebulae.universe.Universe
-import org.lwjgl.opengl.GL40
-import space.earlygrey.shapedrawer.ShapeDrawer
-import java.util.Arrays.asList
 
+const val SKYBOX_SIZE = 2048f;
 
-class GenerationScene(private val generator: UniverseGenerator, val universe: Universe) : VisWindow("") {
+class GenerationScene(private val generator: GalaxyGenerator, val universe: Universe) : VisWindow("") {
 
     private val fontAndromeda = BitmapFont(Gdx.files.internal("fonts/andromeda.fnt"), true)
     private val fontCloseness = BitmapFont(Gdx.files.internal("fonts/closeness.fnt"), true)
@@ -54,7 +50,6 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
     private val starTexturePre = TextureRegion(Texture(Gdx.files.internal("textures/star_pre.png")))
     private val pixelTexture = TextureRegion(Texture(Gdx.files.internal("textures/pixel.png")))
 
-    private val SKYBOX_SIZE = 1024f;
     private var skyboxTextures = mutableListOf<TextureRegion>()
     private var skyboxNeedsUpdate = false
 
@@ -69,10 +64,20 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
     private val multiplexer: InputMultiplexer by lazy { InputMultiplexer(stage, cameraInputController) }
     private val stars = BufferedList<StarDecal>()
 
-    private var focusedSelection: Selection<Star>? = null
-    private var hoveredSelection: Selection<Star>? = null
+    private var focusedSelection: Selection<GameObject>? = null
+        set(value) {
+            cameraInputController.desiredTarget = value?.item!!.position.cpy()
+            println("Selected " + value.item.name)
+            if (value.item is System) {
+                for (star in value.item.stars) {
+                    println("""     $star""")
+                }
+            }
+            field = value
+        }
+    private var hoveredSelection: Selection<GameObject>? = null
 
-    private val focusedNeighbors = mutableListOf<Star>()
+    private val focusedNeighbors = mutableListOf<System>()
     private val focusedNeighborsConnections = mutableListOf<ModelInstance>()
 
     private var nebulaeRenderer: NebulaeRenderer? = null
@@ -105,12 +110,12 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 
         setResizeBorder(10)
         isResizable = true
-        generator.starCreated.clear()
-        generator.starCreated += { starList ->
+        generator.generationFinished.clear()
+        generator.generationFinished += { systemList ->
 
             stars.clear()
-            starList.forEach() {
-                val decal = StarDecal(it, 0.94f)
+            systemList.forEach() {
+                val decal = StarDecal(it.stars[0], 0.94f)
                 stars.add(decal)
             }
             stars.update()
@@ -119,7 +124,7 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
             nebulaeRenderer = NebulaeRenderer(spriteBatch, orthoCam, modelBatch, camera, generator.farthestStarDistance)
             skyboxRenderer = SkyboxRenderer(modelBatch)
             starfieldRenderer = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, width, height)
-            starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, SKYBOX_SIZE, SKYBOX_SIZE)
+            starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, 1024f, 1024f)
             octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
             starRenderer = StarRenderer(modelBatch)
             selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
@@ -154,14 +159,15 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         stage.viewport.apply()
 
         if (skyboxNeedsUpdate) {
-            renderSystemSkybox(focusedSelection!!.item)
+            renderSkybox(focusedSelection!!.item)
             skyboxRenderer!!.textures = skyboxTextures
             skyboxNeedsUpdate = false
         }
 
-        starfieldRenderer!!.renderToFramebuffer(camera)
-        nebulaeRenderer!!.renderToFramebuffer(camera)
-
+        if (viewMode == ViewMode.GALAXY) {
+            starfieldRenderer!!.renderToFramebuffer(camera)
+            nebulaeRenderer!!.renderToFramebuffer(camera)
+        }
         beginScene()
 
         val col = 0.0f
@@ -176,10 +182,12 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
             skyboxRenderer!!.renderToScreen(camera)
         }
 
-        starRenderer!!.starSelection = focusedSelection
-        starRenderer!!.viewMode = viewMode
-        starRenderer!!.renderToScreen(camera)
-
+        if (focusedSelection?.item is System) {
+            @Suppress("UNCHECKED_CAST")
+            starRenderer!!.selection = focusedSelection as Selection<System>?
+            starRenderer!!.viewMode = viewMode
+            starRenderer!!.renderToScreen(camera)
+        }
         if (viewMode == ViewMode.GALAXY) {
             octreeRenderer!!.renderToScreen(camera)
         }
@@ -193,7 +201,7 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         if (focusedSelection != null) {
             focusedSelection!!.selectionTimer += delta.toLong()
             val dst = camera.position.dst(focusedSelection!!.item.position)
-            if (dst < 4f && viewMode == ViewMode.GALAXY) {
+            if (dst < 4f && viewMode == ViewMode.GALAXY && !cameraInputController.isMovingToTarget()) {
                 println("switch view mode to SYSTEM")
                 viewMode = ViewMode.SYSTEM
                 skyboxNeedsUpdate = true
@@ -214,77 +222,96 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 
             this.stage.unfocusAll()
 
-            val mx = Gdx.input.x.toFloat()
-            val my = Gdx.input.y.toFloat()
-            val sx = viewportScreen.screenX
-            val sy = viewportScreen.screenY
-            ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.screenWidth.toFloat(), viewportScreen.screenHeight.toFloat())
+            if (viewMode == ViewMode.GALAXY) {
+                pickStarSelection()
+                if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+                    if (focusedNeighbors.isNotEmpty()) {
+                        focusedSelection = Selection(focusedNeighbors.random())
+                        selectionRenderer!!.focusedSelection = focusedSelection
+                    }
+                }
+            } else if (viewMode == ViewMode.SYSTEM) {
+                if (Gdx.input.isKeyJustPressed(Input.Keys.BACKSPACE)) {
+                    viewMode = ViewMode.GALAXY
+                }
+            }
+        }
+    }
 
-            intersectingNodes.clear()
-            generator.octree.intersect(ray!!, intersectingNodes)
-            val intersection = Vector3()
-            var selection: Star? = null
-            var prevDistToIntersection = 1000f
-            var prevDistToCam = 1000f
-            for (node in intersectingNodes) {
-                for (star in node.getObjects<Star>()) {
-                    if (Intersector.intersectRaySphere(ray, star.position, 0.5f, intersection)) {
-                        if (selection == null) {
-                            selection = star
-                            continue
-                        }
-                        viewportScreen.project(intersection)
-                        viewportScreen.project(tmp.set(star.position))
-                        val dst = intersection.dst2(tmp)
-                        if (dst < prevDistToIntersection && dst < prevDistToCam) {
-                            selection = star
-                            prevDistToIntersection = dst
-                            prevDistToCam = tmp.set(camera.position).dst2(star.position)
-                        }
+    private fun pickStarSelection() {
+        val mx = Gdx.input.x.toFloat()
+        val my = Gdx.input.y.toFloat()
+        val sx = viewportScreen.screenX
+        val sy = viewportScreen.screenY
+        ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.screenWidth.toFloat(), viewportScreen.screenHeight.toFloat())
+
+        intersectingNodes.clear()
+        generator.octree.intersect(ray!!, intersectingNodes)
+        val intersection = Vector3()
+        var selection: System? = null
+        var prevDistToIntersection = 1000f
+        var prevDistToCam = 1000f
+
+        // Ray pick candidates based on mouse ray and distance to camera
+        for (node in intersectingNodes) {
+            for (system in node.getObjects<System>()) {
+                if (Intersector.intersectRaySphere(ray, system.position, 0.5f, intersection)) {
+                    if (selection == null) {
+                        selection = system
+                        continue
+                    }
+                    viewportScreen.project(intersection)
+                    viewportScreen.project(tmp.set(system.position))
+                    val dst = intersection.dst2(tmp)
+                    if (dst < prevDistToIntersection && dst < prevDistToCam) {
+                        selection = system
+                        prevDistToIntersection = dst
+                        prevDistToCam = tmp.set(camera.position).dst2(system.position)
                     }
                 }
             }
+        }
+        if (selection != null) {
+            hoveredSelection = Selection(selection)
+            selectionRenderer!!.hoveredSelection = hoveredSelection
+        } else {
+            selectionRenderer!!.hoveredSelection = null
+        }
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             if (selection != null) {
-                hoveredSelection = Selection(selection)
-                selectionRenderer!!.hoveredSelection = hoveredSelection
-            } else {
-                selectionRenderer!!.hoveredSelection = null
-            }
+                focusedSelection = Selection(selection)
 
-            if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-                if (selection != null) {
-                    cameraInputController.desiredTarget = selection.position.cpy()
-                    focusedSelection = Selection(selection)
-                    starRenderer!!.starSelection = focusedSelection
-                    selectionRenderer!!.focusedSelection = focusedSelection
+                @Suppress("UNCHECKED_CAST")
+                starRenderer!!.selection = focusedSelection as Selection<System>
+                selectionRenderer!!.focusedSelection = focusedSelection
 
-                    focusedNeighbors.clear()
-                    val radius = 5f
-                    generator.octree.intersectSphere(selection.position, radius).forEach {
-                        val stars = it.getObjects<Star>().filter { star ->
-                            star.position.dst2(selection.position) < radius * radius && star != selection
-                        }
-                        focusedNeighbors.addAll(stars)
+                focusedNeighbors.clear()
+                val radius = 5f
+                generator.octree.intersectSphere(selection.position, radius).forEach {
+                    val stars = it.getObjects<System>().filter { system ->
+                        system.position.dst2(selection.position) < radius * radius && system != selection
                     }
-                    focusedNeighborsConnections.forEach {
-                        it.model.disposeSafely()
+                    focusedNeighbors.addAll(stars)
+                }
+                focusedNeighborsConnections.forEach {
+                    it.model.disposeSafely()
+                }
+                focusedNeighborsConnections.clear()
+                if (focusedNeighbors.isNotEmpty()) {
+                    builder.begin()
+                    val material = Material()
+                    material.set(BlendingAttribute(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, 0.55f))
+                    val part = builder.part("line", GL20.GL_LINES, (VertexAttributes.Usage.Position or VertexAttributes.Usage.ColorUnpacked).toLong(), material)
+                    part.setColor(1f, 1f, 1f, 1f)
+                    for (star in focusedNeighbors) {
+                        tmp2.set(selection.position)
+                        tmp2.set(tmp2 - star.position)
+                        val offset = tmp2.nor() * 0.2f
+                        part.line(tmp.set(selection.position) - offset, star.position)
                     }
-                    focusedNeighborsConnections.clear()
-                    if (focusedNeighbors.isNotEmpty()) {
-                        builder.begin()
-                        val material = Material()
-                        material.set(BlendingAttribute(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, 0.55f))
-                        val part = builder.part("line", GL20.GL_LINES, (VertexAttributes.Usage.Position or VertexAttributes.Usage.ColorUnpacked).toLong(), material)
-                        part.setColor(1f, 1f, 1f, 1f)
-                        for (star in focusedNeighbors) {
-                            tmp2.set(selection.position)
-                            tmp2.set(tmp2 - star.position)
-                            val offset = tmp2.nor() * 0.2f
-                            part.line(tmp.set(selection.position) - offset, star.position)
-                        }
-                        val model = builder.end()
-                        focusedNeighborsConnections.add(ModelInstance(model))
-                    }
+                    val model = builder.end()
+                    focusedNeighborsConnections.add(ModelInstance(model))
                 }
             }
         }
@@ -298,9 +325,9 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
         }
     }
 
-    private fun renderSystemSkybox(star: Star) {
+    private fun renderSkybox(obj: GameObject) {
         val cam = PerspectiveCamera(90f, SKYBOX_SIZE, SKYBOX_SIZE);
-        cam.position.set(star.position)
+        cam.position.set(obj.position)
         cam.update()
         val directions = listOf(
                 Vector3.Z.cpy().times(-1),
@@ -328,8 +355,8 @@ class GenerationScene(private val generator: UniverseGenerator, val universe: Un
 //            sb.projectionMatrix = oc.combined
 //            sb.color = Color.WHITE
             fbs[i].begin()
-            Gdx.gl20.glClearColor(0f, 0f, 0f, 0f)
-            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+            Gdx.gl20.glClearColor(0f, 0f, 0f, 1f)
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
             starfieldRendererForSkybox!!.renderToScreen(cam)
             nebulaeRenderer!!.renderToScreen(cam)
 

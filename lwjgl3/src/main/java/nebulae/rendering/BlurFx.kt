@@ -120,7 +120,6 @@ void main() {
             blurShader!!.setUniformf("radius", Settings.graphics.blurRadius)
             blurShader!!.setUniformf("resolution", FBO_WIDTH.toFloat(), FBO_HEIGHT.toFloat())
             blurShader!!.setUniformf("dir", 1f, 0f)
-            val gauss = GaussianFloatDistribution(1.0f, 0.05f)
 
             val weights: FloatArray = FloatArray(8)
             weights.indices.forEach {
@@ -132,6 +131,8 @@ void main() {
             batch.shader = blurShader!!
             val cnt = 3
             pingPong(pingBuffer!!, pongBuffer!!, cnt)
+
+
             //blur verticaly
             blurShader!!.setUniformf("dir", 0f, 1f)
 

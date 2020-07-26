@@ -8,7 +8,7 @@ import nebulae.Nebulae
 
 private val log = logger<MainScreen>()
 
-class MainScreen(game: Nebulae) : VisUIScreen(game) {
+class MainScreen(game: Nebulae) : VisUIScreen() {
 
     init {
         stage.addActor(window("") {

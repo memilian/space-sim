@@ -14,9 +14,9 @@ import org.lwjgl.opengl.GL40
 
 class StarFieldRenderer(private val polygonSpriteBatch: PolygonSpriteBatch, private val orthoCamera: OrthographicCamera, private val fixedBatch: FixedStarBatch, private val initialWidth: Float, private val initialHeight: Float) : IRenderer {
 
-    private var blur: BlurFx? = null
-    private var originalScene: TextureRegion? = null
-    private var blurredScene: TextureRegion? = null
+    var blur: BlurFx? = null
+    var originalScene: TextureRegion? = null
+    var blurredScene: TextureRegion? = null
 
     init {
         init(true)

@@ -29,12 +29,12 @@ class StarShader : ShaderBase("shaders/star.vert.glsl", "shaders/star.frag.glsl"
         program.setUniformf(locations["TEMPERATURE"]!!, star.type.temperature)
 
         Gdx.gl.glDisable(GL20.GL_BLEND)
-        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDepthFunc(GL20.GL_LESS)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
         Gdx.gl.glCullFace(GL20.GL_BACK)
         renderable.meshPart.render(program)
         renderable.meshPart.mesh.unbind(program)
-        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glCullFace(GL20.GL_FRONT)
 
     }

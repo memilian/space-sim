@@ -13,8 +13,7 @@ import ktx.app.KtxScreen
 import ktx.async.enableKtxCoroutines
 import ktx.inject.Context
 import ktx.log.logger
-import nebulae.generation.Settings
-import nebulae.generation.UniverseGenerator
+import nebulae.generation.GalaxyGenerator
 import nebulae.kutils.FrameRate
 import nebulae.screens.GenerationScreen
 import nebulae.screens.MainScreen
@@ -49,7 +48,7 @@ class Nebulae : KtxGame<KtxScreen>() {
             bindSingleton(BitmapFont())
             bindSingleton(AssetManager())
             bindSingleton(Universe())
-            bindSingleton(UniverseGenerator())
+            bindSingleton(GalaxyGenerator())
             addScreen(MainScreen(inject()))
             addScreen(GenerationScreen(inject(), inject(), inject()))
         }
@@ -61,7 +60,7 @@ class Nebulae : KtxGame<KtxScreen>() {
     }
 
     private fun setupGLDebug() {
-        val proc = GLDebugMessageCallback.create { source: Int, type: Int, id: Int, severity: Int, length: Int, message: Long, userParam: Long ->
+        val proc = GLDebugMessageCallback.create { _: Int, _: Int, id: Int, severity: Int, length: Int, message: Long, _: Long ->
             if (severity == GL43C.GL_DEBUG_SEVERITY_NOTIFICATION) {
                 return@create
             }
