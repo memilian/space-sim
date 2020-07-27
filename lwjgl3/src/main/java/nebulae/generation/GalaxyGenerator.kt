@@ -12,7 +12,6 @@ import nebulae.data.*
 import nebulae.generation.text.MarkovGenerator
 import nebulae.kutils.*
 import java.lang.Float.min
-import java.lang.Math.pow
 import kotlin.math.log
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -20,6 +19,7 @@ import kotlin.random.Random
 
 import nebulae.data.SpectralClass.*;
 import nebulae.data.LuminosityClass.*;
+import nebulae.orbital.computePosition
 
 class GalaxyGenerator(private val seed: Long = 123135464L) {
 
@@ -40,7 +40,6 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
         systems.clear()
         galaxy?.arms?.clear()
         generateGalaxy()
-        generateSectors()
         generateStarSystems()
     }
 
@@ -110,43 +109,54 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                     if (toCenter > farthestStarDistance) {
                         farthestStarDistance = toCenter
                     }
-                    val star = generateStar(winner)
+
+
                     val stars = mutableListOf<Star>()
+                    val planets = mutableListOf<Planet>()
+
+                    val boundsSize = 0.0001f
+                    val system = System(
+                            BoundingBox(winner.cpy().sub(boundsSize), winner.cpy().add(boundsSize)),
+                            winner.cpy(),
+                            "",
+                            Vector3(),
+                            stars,
+                            planets)
+
+                    val star = generateStar(system, Vector3(), 0f)
                     stars.add(star)
                     var moreStarProba = 0.45f
                     while (rand.nextFloat() < moreStarProba) { // multiple star systems
-                        stars.add(generateStar(winner.cpy().add(rand.range(0.1f, 1f), rand.range(0.1f, 1f), 0f)))
+                        val parent = stars[stars.size - 1]
+                        stars.add(generateStar(system, parent.position, parent.bodyInfos.radius))
                         moreStarProba *= 0.6f
                         if (stars.size > 6) {
                             break
                         }
                     }
 
-                    var barycenter = stars[0].position.cpy()
                     if (stars.size > 1) {
-                        barycenter = computeBarycenter(stars.map {
-                            Pair(it.position, it.mass)
+                        val barycenter = computeBarycenter(stars.map {
+                            Pair(it.position, it.bodyInfos.mass)
                         }.toMutableList())
+                        system.barycenter.set(barycenter)
                         // TODO: in case of triple systems and more, assign a barycenter to each pair of component (in cases of c -> ab, a common barycenter for a and b then another for c and ab)
                         // TODO: adjust star names to denote a multi system configuration : append a letter to each star, A B C.. or use https://en.wikipedia.org/wiki/Bayer_designation
                         // TODO: rescale the galaxy so that distance units are represented in AU
                     }
 
                     val planetCount = rand.nextInt(0, 12)
-                    val planets = mutableListOf<Planet>()
-                    var lastPlanetDist = 0f
+                    var lastPlanetDist = stars[0].bodyInfos.orbitalParameters.semiMajorAxis + stars[0].bodyInfos.radius * KM_TO_AU
                     for (i in 0 until planetCount) {
-                        val planet = generatePlanet(lastPlanetDist)
-                        lastPlanetDist = planet.orbitalParameters.semiMajorAxis
+                        val planet = generatePlanet(system, lastPlanetDist, stars[0])
+                        lastPlanetDist = planet.bodyInfos.orbitalParameters.semiMajorAxis
                         planets.add(planet)
                         if (lastPlanetDist > 50f) {
                             break
                         }
                     }
 
-                    val boundsSize = 0.0001f
-                    val pos = stars[0].position;
-                    val system = System(BoundingBox(pos.cpy().sub(boundsSize), pos.cpy().add(boundsSize)), barycenter, stars, planets, stars[0].name + " (" + stars.size + ")")
+                    system.name = stars[0].name + " (" + stars.size + ")";
                     octree.insert(system)
                     this.systems.add(system);
                     candidates.clear()
@@ -169,7 +179,7 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
         return weightedPosSum / totalMass
     }
 
-    private fun generatePlanet(lastPlanetDist: Float): Planet {
+    private fun generatePlanet(system: System, lastPlanetDist: Float, parent: ICelestialBody): Planet {
 
         val inclinationRange = rand.nextFloat()
         val inclination = when {
@@ -180,7 +190,6 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
 
         val dist = lastPlanetDist + (0.1f + rand.nextFloat() * (1f + lastPlanetDist.smoothstep(0f, 10f) * 10f))
         val angle = (rand.nextFloat() * Math.PI * 2f).toFloat()
-        val pos = Vector3(cos(angle) * dist, sin(angle) * dist, 0f)
 
         //size based on https://en.wikipedia.org/wiki/Terrestrial_planet#/media/File:Size_of_Kepler_Planet_Candidates.jpg
         val sizeRange = rand.nextFloat()
@@ -194,13 +203,35 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
 
         val type = if (sizeRange > 0.6f || rand.nextFloat() < min(0.75f, 0.5f * log((dist + 0.5f) / 50f, 1f) + 1)) PlanetType.GASEOUS else PlanetType.ROCKY
 
-        //TODO: compute real orbital parameters -> https://en.wikipedia.org/wiki/Orbital_elements    https://marine.rutgers.edu/cool/education/class/paul/orbits.html
-        val orbitalParameters = OrbitalParameters(0f, dist, inclination, 0f, 0f, 0f)
+        //TODO: ensure consistency with planet type
+        val density = rand.range(0.1f, 20f) // in g/cm3
+        val mass = (4 / 3) * PI * radius.pow(3) * density * 1e12f // in kg
+
+        val eccentricityRng = rand.range(0.0001f, 1.0f);
+        val eccentricity = distribute(eccentricityRng)
+        val orbitalParameters = OrbitalParameters(
+                eccentricity,
+                dist,
+                // tie high inclination to high eccentricity
+                (eccentricity * PI - PI * 0.5f) * rand.range(0.5f, 0.9f),
+                rand.range(0f, PI2),
+                rand.range(PI * 0.25f, PI * 0.75f), // might need to revise this range
+                rand.range(0f, PI2),
+                0f,
+                PI2 * sqrt((dist * AU_TO_M).pow(3) / (G_CONSTANT * (mass + parent.bodyInfos.mass))),
+                parent)
+        val bodyInfos = CelestialBodyInfo(system, orbitalParameters, radius, mass, density)
         val name = nameGenerator.generate(4)
-        return Planet(BoundingBox(pos.cpy().sub(radius), pos.cpy().add(radius)), name, PlanetDescriptor(type, radius), orbitalParameters)
+        val pos = computePosition(orbitalParameters, 0f)
+        return Planet(BoundingBox(pos.cpy().sub(radius), pos.cpy().add(radius)), pos, name, PlanetDescriptor(type), bodyInfos)
     }
 
-    private fun generateStar(position: Vector3): Star {
+    // create a distribution where 0.0001 < value < 0.1 for x < 0.9  then increase up to 0.93
+    private fun distribute(x: Float): Float {
+        return x * (cos((x + 0.2f)) * 0.2f) + sin((x + 0.004f).pow(8)).pow(8)
+    }
+
+    private fun generateStar(system: System, parentPos: Vector3, minDist: Float): Star {
         val spectralClass = SpectralClass.random(rand)
         val temperature = rand.range(spectralClass.temperatureRange)
         val luminosityClass = LuminosityClass.random(rand, spectralClass)
@@ -227,7 +258,7 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
         val radius = sqrt(lum) * 5778f.pow(2f) / temperature.pow(2) //in solar radius. https://sciencing.com/characteristics-star-5916715.html
         val type = StarType(spectralClass, luminosityClass, temperature, lum, spectralClass.getSubClass(temperature))
 
-        val mass = when {
+        val mass = when { // in solar mass
             lum > 1.76e6 -> { //approximation based on https://en.wikipedia.org/wiki/Mass%E2%80%93luminosity_relation
                 lum / 32000f
             }
@@ -241,19 +272,36 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                 (lum / 0.23f).pow(1 / 2.3f)
             }
         }
+
+        val radiusKm = radius * SOLAR_RADIUS_TO_KM
+        val radiusAu = radiusKm * KM_TO_AU
+        val massKg = mass * SOLAR_MASS_TO_KG
+        val density = massKg / (4 * PI * radiusKm.pow(3) / 3) * 1e-12f // in g/cm3
+
+        val semiMajorAxis = minDist * KM_TO_AU + rand.range(0.1f + radiusAu, 10f + radiusAu)
+        val orbitalParameters = OrbitalParameters(
+                rand.nextFloat() * 0.01f,
+                semiMajorAxis,
+                rand.nextFloat() * 0.1f,
+                rand.range(0f, PI),
+                rand.range(PI * 0.25f, PI * 0.75f), // might need to revise this range
+                rand.range(0f, PI2),
+                0f,
+                PI2 * sqrt((semiMajorAxis * AU_TO_KM).pow(3) / (G_CONSTANT * (massKg))), //TODO: add the other stars mass
+                null)
+
+        val bodyInfos = CelestialBodyInfo(system, orbitalParameters, radiusKm, massKg, density)
+
+        val position = parentPos + computePosition(orbitalParameters, 0f)
         val boundsSize = 0.0001f
         return Star(
                 BoundingBox(
                         position.cpy().add(-boundsSize, -boundsSize, -boundsSize),
                         position.cpy().add(boundsSize, boundsSize, boundsSize)),
+                position.cpy(),
                 nameGenerator.generate(rand.nextInt(4, 8)),
-                radius, mass,
-                type
+                type, bodyInfos
         )
-    }
-
-    private fun generateSectors() {
-
     }
 
 

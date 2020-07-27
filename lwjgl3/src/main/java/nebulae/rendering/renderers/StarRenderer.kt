@@ -9,17 +9,19 @@ import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
+import com.badlogic.gdx.math.MathUtils.log
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.TimeUtils
 import ktx.assets.disposeSafely
-import nebulae.data.GameObject
-import nebulae.data.Star
-import nebulae.data.System
+import ktx.math.times
+import nebulae.data.*
+import nebulae.kutils.plus
 import nebulae.kutils.smoothstep
 import nebulae.rendering.shaders.StarShader
 import nebulae.screens.ViewMode
 import nebulae.selection.Selection
+import java.lang.Float.max
 import kotlin.math.min
 
 class StarRenderer(private val modelBatch: ModelBatch) : IRenderer {
@@ -31,6 +33,7 @@ class StarRenderer(private val modelBatch: ModelBatch) : IRenderer {
     private var modelInstances = mutableListOf<ModelInstance>()
     private val builder = ModelBuilder()
     private val tmp = Vector3()
+    private val tmp2 = Vector3()
     private val tmpMat = Matrix4()
 
     init {
@@ -50,18 +53,29 @@ class StarRenderer(private val modelBatch: ModelBatch) : IRenderer {
         if (selection == null || modelInstances.isEmpty()) {
             return
         }
-        for ((index, star) in selection!!.item.stars.withIndex()) {
+        val stars = selection!!.item.stars.toMutableList()
+        stars.sortByDescending { it.bodyInfos.radius }
+        for ((index, star) in stars.withIndex()) {
             val model = modelInstances[index]
 
             modelBatch.begin(camera)
-            val pos = star.position
-            val dst = tmp.set(pos).dst(camera.position)
+            val systemPos = selection!!.item.position
+            val dst = systemPos.dst(camera.position)
+            val radius = star.bodyInfos.radius * KM_TO_AU
             val scale = when (viewMode) {
-                ViewMode.GALAXY -> 0.82f * min(dst.smoothstep(10f, 5f), TimeUtils.timeSinceMillis(selection!!.selectionTimer).toFloat().smoothstep(0f, 500f))
-                ViewMode.SYSTEM -> 1.0f
+                ViewMode.GALAXY -> max(0.05f, min(radius / (stars[0].bodyInfos.radius * KM_TO_AU), 10f))
+                ViewMode.SYSTEM -> radius * AU_TO_SYSTEM
             }
-            model.userData = star;
-            model.transform = tmpMat.idt().translate(pos).scale(scale, scale, scale)
+            model.userData = star
+            if (viewMode == ViewMode.GALAXY) {
+                tmp.set(selection!!.item.position)
+                tmp2.set(star.position)
+
+                val sc = min(dst.smoothstep(10f, 5f), TimeUtils.timeSinceMillis(selection!!.selectionTimer).toFloat().smoothstep(0f, 100f))
+                model.transform = tmpMat.idt().translate(tmp + tmp2 * 0.1f).scale(scale * sc, scale * sc, scale * sc)
+            } else {
+                model.transform = tmpMat.idt().translate(star.position).scale(scale, scale, scale)
+            }
             modelBatch.render(model, starShader)
             modelBatch.end()
         }

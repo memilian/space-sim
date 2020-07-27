@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.g2d.TextureRegion
+import com.badlogic.gdx.math.Vector3
 import ktx.app.use
 import ktx.assets.disposeSafely
 import nebulae.generation.Settings
@@ -31,9 +32,11 @@ class StarFieldRenderer(private val polygonSpriteBatch: PolygonSpriteBatch, priv
         originalScene!!.flip(false, true)
     }
 
+    var scale = 1f
+    var position = Vector3()
     override fun renderToFramebuffer(camera: Camera) {
         blurredScene = blur!!.renderToTexture {
-            fixedBatch.render(camera)
+            fixedBatch.render(camera, scale, position)
         }
     }
 

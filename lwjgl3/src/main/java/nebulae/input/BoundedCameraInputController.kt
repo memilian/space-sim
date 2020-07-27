@@ -14,7 +14,9 @@ import ktx.math.times
 import nebulae.kutils.setZ
 import java.lang.Float.max
 import java.lang.Float.min
+import kotlin.jvm.internal.Reflection
 import kotlin.math.*
+import kotlin.reflect.full.memberProperties
 
 class BoundedCameraInputController(private val camera: Camera, var bounds: Rectangle) : InputAdapter() {
 
@@ -153,6 +155,12 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
         timer += delta
     }
 
+    fun setTargetDistanceImmediate(dist: Float) {
+        val currentDistance = camera.position.dst(target);
+        camera.lookAt(target)
+        camera.translate(tmp1.set(camera.direction).nor().scl(currentDistance - dist))
+    }
+
     private fun updateDistanceFactor() {
         val maxDistEffect = 500f
         val minDistEffect = 10f
@@ -213,4 +221,13 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
     fun isInBounds(): Boolean {
         return bounds.contains(Gdx.input.x.toFloat(), Gdx.graphics.height - Gdx.input.y.toFloat())
     }
+
+    fun killScroll() {
+        desiredDistance = 0f
+    }
+
+    fun resetTimer() {
+        timer = 10000f;
+    }
+
 }

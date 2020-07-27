@@ -7,6 +7,10 @@ import nebulae.screens.annotations.*
 class Settings() {
 
     companion object {
+
+        @Tab
+        public var game = Game()
+
         @Tab()
         public var generation = Generation()
 
@@ -15,6 +19,11 @@ class Settings() {
 
         @Tab()
         public var debug = Debug()
+    }
+
+    class Game {
+        @Range(from = 0f, to = 10000f, step = 10f)
+        var timeSpeed = 1000f
     }
 
     class Graphics {
@@ -59,6 +68,9 @@ class Settings() {
     }
 
     class Debug {
+
+        @Check
+        var drawAxis = true
 
         @Range(from = 0f, to = 5f, step = 0.005f)
         var factor = 0.45f;

@@ -26,7 +26,14 @@ void main()
     float d1 = (0.5 + (0.5 * fbm(vec4(vertexPos.xyz * 10.0, TIME * timeScale *  0.0003), 2)));
     float d2 = 0.5 + 0.5 * voronoise(vec4(vertexPos.xyz * 10.0, TIME * timeScale *  0.0005), 0.5);
     float d3 = 0.5 + 0.5 * voronoise(vec4(vertexPos.xzy * 40.0, TIME * timeScale *  0.0005), 0.5);
-    fragColor.rgb =  color.rgb * (d1 + 0.25) * d3 * d2+ (d2*d3*d1) * 0.1;
+
+    //higher scale details
+    // TODO instead of adding noise layers, scale existing layers depending on the size of the star
+    //    float d4 = 0.5 + 0.5 * voronoise(vec4(vertexPos.xyz * 0.01, TIME * timeScale *  0.00001), 0.02);
+    //    float d5 = 0.8 * (0.5 + (fbm(vec4(vertexPos.xyz * 1000.0, TIME * timeScale *  3), 0.0001)));
+    //    float d6 = 0.8 * (0.5 + (fbm(vec4(vertexPos.xyz * 1000.0, TIME * timeScale *  0.6), 0.001)));
+
+    fragColor.rgb =  color.rgb * (d1 + 0.25) * 0.5 * d3 * d2+ (d2*d3*d1) * 0.1;
     fragColor.rgb *= 1.0 +(1 - smoothstep(0, 40000, TEMPERATURE)) * 3;
     fragColor *= mix(1.2, 0.48, 1 - TEMPERATURE / 40000);
     fragColor.a = 1.0;

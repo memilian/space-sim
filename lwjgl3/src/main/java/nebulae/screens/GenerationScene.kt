@@ -27,6 +27,8 @@ import nebulae.generation.GalaxyGenerator
 import nebulae.input.BoundedCameraInputController
 import nebulae.kutils.BufferedList
 import nebulae.kutils.minus
+import nebulae.kutils.smoothstep
+import nebulae.orbital.computePosition
 import nebulae.rendering.*
 import nebulae.rendering.renderers.*
 import nebulae.selection.Selection
@@ -67,12 +69,11 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private var focusedSelection: Selection<GameObject>? = null
         set(value) {
             cameraInputController.desiredTarget = value?.item!!.position.cpy()
-            println("Selected " + value.item.name)
+            selectionRenderer?.focusedSelection = value
             if (value.item is System) {
-                for (star in value.item.stars) {
-                    println("""     $star""")
-                }
+                orbitRenderer?.createOrbits(value.item.let { it.stars + it.planets }.map { it.bodyInfos })
             }
+            println("Selected " + value.item)
             field = value
         }
     private var hoveredSelection: Selection<GameObject>? = null
@@ -87,6 +88,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private var octreeRenderer: OctreeRenderer? = null
     private var starRenderer: StarRenderer? = null
     private var selectionRenderer: SelectionRenderer? = null
+    private var orbitRenderer: OrbitRenderer? = null
+    private var debugRenderer: DebugRenderer? = null
 
     private var intersectingNodes: MutableList<Octree> = mutableListOf()
 
@@ -103,8 +106,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 
         camera.position.set(150f, 150f, 150f)
         camera.up.set(0f, 0f, 1f)
-        camera.near = 1f
-        camera.far = 10000f
+        camera.near = 0.1f
+        camera.far = 100000f
         camera.lookAt(0f, 0f, 0f)
         camera.update()
 
@@ -128,6 +131,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
             starRenderer = StarRenderer(modelBatch)
             selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
+            orbitRenderer = OrbitRenderer(modelBatch)
+            debugRenderer = DebugRenderer(modelBatch)
         }
 
         skyboxRenderer?.disposeSafely()
@@ -165,6 +170,10 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         }
 
         if (viewMode == ViewMode.GALAXY) {
+            if (focusedSelection != null) {
+                starfieldRenderer!!.scale = 1f + 8 * camera.position.dst(focusedSelection!!.item.position).smoothstep(10f, 0f)
+                starfieldRenderer!!.position = focusedSelection!!.item.position
+            }
             starfieldRenderer!!.renderToFramebuffer(camera)
             nebulaeRenderer!!.renderToFramebuffer(camera)
         }
@@ -191,23 +200,31 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         if (viewMode == ViewMode.GALAXY) {
             octreeRenderer!!.renderToScreen(camera)
         }
+        if (focusedSelection != null && focusedSelection!!.item is System) {
+            orbitRenderer!!.renderToScreen(camera);
+        }
+        debugRenderer!!.renderToScreen(camera);
         endScene(_batch)
     }
 
     private var ray: Ray? = null
+    var gameTime = 0f
     override fun act(delta: Float) {
         super.act(delta)
+        gameTime += delta
+        if (viewMode == ViewMode.SYSTEM && focusedSelection?.item is System) {
+            for (star in (focusedSelection!!.item as System).stars) {
+                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed))
+            }
+        }
 
         if (focusedSelection != null) {
             focusedSelection!!.selectionTimer += delta.toLong()
             val dst = camera.position.dst(focusedSelection!!.item.position)
             if (dst < 4f && viewMode == ViewMode.GALAXY && !cameraInputController.isMovingToTarget()) {
-                println("switch view mode to SYSTEM")
-                viewMode = ViewMode.SYSTEM
-                skyboxNeedsUpdate = true
-            } else if (dst > 100f && viewMode == ViewMode.SYSTEM) {
-                viewMode = ViewMode.GALAXY
-                println("switch view mode to GALAXY")
+                switchToSystemView()
+            } else if (dst > 100000f && viewMode == ViewMode.SYSTEM) {
+                switchToGalaxyView()
             }
         }
         if (hoveredSelection != null) {
@@ -219,7 +236,6 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         cameraInputController.autoRotate = Settings.debug.autoRotate
         cameraInputController.update()
         if (cameraInputController.isInBounds()) {
-
             this.stage.unfocusAll()
 
             if (viewMode == ViewMode.GALAXY) {
@@ -227,15 +243,38 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
                 if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
                     if (focusedNeighbors.isNotEmpty()) {
                         focusedSelection = Selection(focusedNeighbors.random())
-                        selectionRenderer!!.focusedSelection = focusedSelection
                     }
+                }
+                if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && focusedSelection != null) {
+                    switchToSystemView()
                 }
             } else if (viewMode == ViewMode.SYSTEM) {
                 if (Gdx.input.isKeyJustPressed(Input.Keys.BACKSPACE)) {
-                    viewMode = ViewMode.GALAXY
+                    switchToGalaxyView()
                 }
             }
         }
+    }
+
+    private fun switchToSystemView() {
+        println("switch view mode to SYSTEM")
+        viewMode = ViewMode.SYSTEM
+        skyboxNeedsUpdate = true
+        cameraInputController.killScroll();
+        cameraInputController.desiredTarget = Vector3()
+        cameraInputController.resetTimer();
+        camera.position.set(0f, 0f, 0f)
+        cameraInputController.setTargetDistanceImmediate(5f);
+    }
+
+    private fun switchToGalaxyView() {
+        cameraInputController.desiredTarget = focusedSelection!!.item.position.cpy()
+        camera.position.set(focusedSelection!!.item.position.cpy())
+        cameraInputController.setTargetDistanceImmediate(5f);
+        cameraInputController.killScroll();
+        cameraInputController.resetTimer();
+        viewMode = ViewMode.GALAXY
+        println("switch view mode to GALAXY")
     }
 
     private fun pickStarSelection() {
@@ -281,10 +320,6 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             if (selection != null) {
                 focusedSelection = Selection(selection)
-
-                @Suppress("UNCHECKED_CAST")
-                starRenderer!!.selection = focusedSelection as Selection<System>
-                selectionRenderer!!.focusedSelection = focusedSelection
 
                 focusedNeighbors.clear()
                 val radius = 5f
@@ -383,6 +418,9 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         starfieldRendererForSkybox.disposeSafely()
         skyboxRenderer.disposeSafely()
         selectionRenderer.disposeSafely()
+        starRenderer.disposeSafely()
+        debugRenderer.disposeSafely()
+        orbitRenderer.disposeSafely()
 
         decalBatch.disposeSafely();
         polygonSpriteBatch.disposeSafely()
@@ -456,9 +494,9 @@ class StarDecal(val star: Star, val size: Float) {
     val vertices = FloatArray(SIZE)
 
     init {
-        vertices[0] = star.position.x
-        vertices[1] = star.position.y
-        vertices[2] = star.position.z
+        vertices[0] = star.bodyInfos.system.position.x
+        vertices[1] = star.bodyInfos.system.position.y
+        vertices[2] = star.bodyInfos.system.position.z
         vertices[3] = star.type.temperature
     }
 }

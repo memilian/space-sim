@@ -9,37 +9,140 @@ import nebulae.kutils.component2
 import nebulae.kutils.v2
 
 
-open class GameObject(open val boundingBox: BoundingBox, val position: Vector3, open val name: String = "") {
+interface GameObject {
+    val boundingBox: BoundingBox
+    val position: Vector3
+    val name: String
+}
+
+interface ICelestialBody : GameObject {
+    val bodyInfos: CelestialBodyInfo
+}
+
+
+data class CelestialBodyInfo(
+        val system: System,
+        val orbitalParameters: OrbitalParameters,
+        val radius: Float,
+        val mass: Float,
+        val density: Float) {
+
+
+    fun toString(prefix: String): String {
+        return """
+            |${prefix} radius: $radius km  mass: $mass kg
+            |${prefix} orbit: ${orbitalParameters.toString("\t" + prefix)}
+        """.trimMargin()
+    }
+
+    override fun toString(): String {
+        return toString("")
+    }
+}
+
+data class OrbitalParameters(val eccentricity: Float,
+                             val semiMajorAxis: Float,
+                             val inclination: Float,
+                             val ascendingNode: Float,
+                             val periapsisArg: Float,
+                             val meanAnomalyAtEpoch: Float,
+                             var trueAnomaly: Float,
+                             var period: Float,
+                             var orbitingBody: ICelestialBody?) {
+    fun toString(prefix: String): String {
+        return """ orbiting ${when (orbitingBody == null) {
+            true -> "none"
+            false -> orbitingBody!!.name
+        }}
+            |${prefix} eccentricity: $eccentricity  semiMajorAxis: $semiMajorAxis  inclination: $inclination
+            |${prefix} ascendingNode: $ascendingNode  periapsisArg: $periapsisArg  meanAnomalyAtEpoch: $meanAnomalyAtEpoch
+            |${prefix} trueAnomaly: $trueAnomaly  period: ${period * SEC_TO_DAY} days  
+        """.trimMargin()
+    }
+
+    override fun toString(): String {
+        return toString("")
+    }
 }
 
 data class Galaxy(val name: String, var sectors: List<Sector>, var arms: MutableList<List<Vector2>>)
 
 /** Game objects **/
-data class Sector(override val boundingBox: BoundingBox, override val name: String) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
 
-data class System(override val boundingBox: BoundingBox, val barycenter: Vector3, val stars: List<Star>, val planets: List<Planet>, override val name: String) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
+data class Sector(override val boundingBox: BoundingBox, override val position: Vector3, override val name: String) : GameObject
 
-data class Planet(override val boundingBox: BoundingBox, override val name: String, val descriptor: PlanetDescriptor, val orbitalParameters: OrbitalParameters) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ))
-
-data class Star(override val boundingBox: BoundingBox, override val name: String, val radius: Float, val mass: Float, val type: StarType, val orbitalParameters: OrbitalParameters? = null) : GameObject(boundingBox, Vector3(boundingBox.centerX, boundingBox.centerY, boundingBox.centerZ)) {
-    override fun toString(): String {
-        return """$name $type 
-            |   radius : $radius sun radii  mass : $mass sun mass
+data class System(override val boundingBox: BoundingBox,
+                  override val position: Vector3,
+                  override var name: String,
+                  val barycenter: Vector3,
+                  val stars: List<Star>,
+                  val planets: List<Planet>
+) : GameObject {
+    private fun toString(prefix: String): String {
+        return """${prefix}System $name
+            |${prefix} Barycenter : $barycenter
+            |${prefix} stars :
+            | ${stars.map { it.toString(prefix + "\t") + "\n" }}
+            |${prefix} planets :
+            | ${planets.map { it.toString(prefix + "\t") + "\n" }}
         """.trimMargin()
+    }
+
+    override fun toString(): String {
+        return toString("")
+    }
+}
+
+
+data class Planet(override val boundingBox: BoundingBox,
+                  override val position: Vector3,
+                  override val name: String,
+                  val descriptor: PlanetDescriptor,
+                  override val bodyInfos: CelestialBodyInfo) : ICelestialBody {
+    fun toString(prefix: String): String {
+        return """${prefix}Planet $name
+            |${prefix} $position
+            |${prefix} $descriptor
+            |${prefix} ${bodyInfos.toString(prefix + "\t")}
+        """.trimMargin()
+    }
+
+    override fun toString(): String {
+        return toString("")
+    }
+}
+
+data class Star(override val boundingBox: BoundingBox,
+                override val position: Vector3,
+                override val name: String,
+                val type: StarType,
+                override val bodyInfos: CelestialBodyInfo) : ICelestialBody {
+    fun toString(prefix: String): String {
+        return """${prefix}Star $name ${type.toString("\t" + prefix)}
+             |${prefix} $position
+             |$prefix   ${bodyInfos.toString(prefix + "\t")}
+        """.trimMargin()
+    }
+
+    override fun toString(): String {
+        return toString("")
     }
 }
 
 /** other **/
+
 data class StarType(val spectralClass: SpectralClass, val luminosityClass: LuminosityClass, val temperature: Float, val luminosity: Float, val subClass: Int) {
+    fun toString(prefix: String): String {
+        return """$prefix${spectralClass.name}${subClass} ${luminosityClass.name} ${luminosityClass.className}
+                 |$prefix   luminosity : $luminosity  temperature : ${temperature}K
+        """.trimMargin()
+    }
 
     override fun toString(): String {
-        return """${spectralClass.name}${subClass} ${luminosityClass.name} ${luminosityClass.className}
-            |   luminosity : $luminosity  temperature : ${temperature}K
-        """.trimMargin()
+        return toString("")
     }
 }
 
-data class OrbitalParameters(val eccentricity: Float, val semiMajorAxis: Float, val inclination: Float, val ascendingNode: Float, val periapsisArg: Float, var trueAnomaly: Float)
 
 enum class SpectralClass(val temperatureRange: Vector2, val probability: Float, vararg val excludedLuminosityClasses: LuminosityClass) {
     W(50000f v2 200000f, 0.01f, II, III, IV, V, VI, VII),
@@ -100,4 +203,4 @@ enum class PlanetType() {
     ROCKY
 }
 
-data class PlanetDescriptor(val type: PlanetType, val radius: Float)
+data class PlanetDescriptor(val type: PlanetType)
