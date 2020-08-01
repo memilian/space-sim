@@ -93,3 +93,8 @@ fun Float.smoothstep(vmin: Float, vmax: Float): Float {
     val x = MathUtils.clamp((this - vmin) / (vmax - vmin), 0f, 1f)
     return x * x * (3 - 2 * x)
 }
+
+fun Double.smoothstep(vmin: Double, vmax: Double): Double {
+    val x: Double = MathUtils.clamp((this - vmin) / (vmax - vmin), 0.0, 1.0)
+    return x * x * (3 - 2.0 * x)
+}

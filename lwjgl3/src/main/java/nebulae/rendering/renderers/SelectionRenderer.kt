@@ -56,6 +56,8 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
     private val hoveredFb = FrameBuffer(Pixmap.Format.RGBA8888, 1024, 256, false)
     private val tmp2 = Vector3()
     private val tmp = Vector3()
+    private val spriteBatch = SpriteBatch()
+
 
     init {
         init(true);
@@ -83,7 +85,7 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
             decal.setDimensions(size, size)
             decal.lookAt(camera.position, camera.up)
             decal.setBlending(GL40.GL_ONE, GL40.GL_ONE)
-            decal.color = Color(0.48f, 0.78f, 1.0f, 0.5f)
+            decal.color = Color(0.48f, 0.78f, 1.0f, 1f)
             decalBatch.add(decal)
             hoveredTextDecal.position.set(starPosition)
             drawTextDecal(hoveredTextDecal, computeScale(starPosition))
@@ -159,7 +161,6 @@ class SelectionRenderer(private val camera: Camera, private val orthoCam: Orthog
             Gdx.gl.glClearColor(0f, 0f, 0f, 0f)
             Gdx.gl.glClear(GL40.GL_COLOR_BUFFER_BIT or GL40.GL_DEPTH_BUFFER_BIT)
 
-            val spriteBatch = SpriteBatch()
             spriteBatch.projectionMatrix = orthoCam.combined
             spriteBatch.use {
                 spriteBatch.color = Color.WHITE

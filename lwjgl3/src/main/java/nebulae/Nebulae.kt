@@ -87,8 +87,6 @@ class Nebulae : KtxGame<KtxScreen>() {
         for (screen in screens.values()) {
             screen.resize(width, height)
         }
-        println(width)
-
     }
 
     override fun render() {

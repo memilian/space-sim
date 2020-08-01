@@ -27,7 +27,7 @@ class Settings() {
     }
 
     class Graphics {
-        @Range(from = 0f, to = 10f, step = 0.1f)
+        @Range(from = 0f, to = 2f, step = 0.01f)
         var blurRadius = 1.3f
 
         @Range(from = 0f, to = 100f, step = 1f)
@@ -48,7 +48,7 @@ class Settings() {
 
     class Generation {
         @WithDescription("Number of stars to generate")
-        @Range(from = 10000f, to = 10_000_000f, step = 10000f)
+        @Range(from = 10000f, to = 2_000_000f, step = 1000f)
         var starCount = 100_000
 
         @Range(from = 1f, to = 10f, step = 1f)
@@ -69,9 +69,6 @@ class Settings() {
 
     class Debug {
 
-        @Check
-        var drawAxis = true
-
         @Range(from = 0f, to = 5f, step = 0.005f)
         var factor = 0.45f;
 
@@ -80,6 +77,9 @@ class Settings() {
 
         @Range(from = 0f, to = 4f, step = 0.05f)
         var amplitude = 1f;
+
+        @Check
+        var drawAxis = false
 
         @Check
         var drawStars = true

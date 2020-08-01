@@ -13,7 +13,9 @@ import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import ktx.assets.disposeSafely
 import ktx.math.times
+import nebulae.data.AU_TO_SYSTEM
 import nebulae.data.CelestialBodyInfo
+import nebulae.data.KM_TO_SYSTEM
 import nebulae.data.Octree
 import nebulae.generation.Settings
 import nebulae.kutils.minus
@@ -39,8 +41,8 @@ class OrbitRenderer(private val modelBatch: ModelBatch) : IRenderer {
 
         modelBatch.begin(camera)
         Gdx.gl.glEnable(GL40.GL_LINE_SMOOTH)
-        Gdx.gl.glLineWidth(1f)
-        Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE)
+        Gdx.gl.glLineWidth(0.1f)
+        Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE_MINUS_SRC_ALPHA)
         for (node in orbits) {
             modelBatch.render(node)
         }
@@ -56,11 +58,11 @@ class OrbitRenderer(private val modelBatch: ModelBatch) : IRenderer {
             val positions = mutableListOf<Vector3>()
             println("""#### Period : ${body.orbitalParameters.period}""")
             for (i in 0..60) {
-                positions.add(computePosition(body.orbitalParameters, i * body.orbitalParameters.period / 60))
+                positions.add(computePosition(body.orbitalParameters, i * body.orbitalParameters.period / 60, AU_TO_SYSTEM))
             }
             builder.begin()
             val material = Material()
-            material.set(BlendingAttribute(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, 0.55f))
+            material.set(BlendingAttribute(true, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, 0.055f))
             val part = builder.part("line", GL20.GL_LINES, (VertexAttributes.Usage.Position or VertexAttributes.Usage.ColorUnpacked).toLong(), material)
             part.setColor(1f, 1f, 1f, 1f)
             for (index in 1 until positions.size) {

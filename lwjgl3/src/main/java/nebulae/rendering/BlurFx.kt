@@ -17,7 +17,7 @@ import nebulae.generation.Settings
 import org.lwjgl.opengl.GL40
 
 
-class BlurFx(private val camera: OrthographicCamera, val batch: Batch, var baseWidth: Int, var baseHeight: Int) : Disposable {
+class BlurFx(private val camera: OrthographicCamera, private val batch: Batch, var baseWidth: Int, var baseHeight: Int) : Disposable {
     private val VERT = """
 attribute vec4 ${ShaderProgram.POSITION_ATTRIBUTE};
 attribute vec4 ${ShaderProgram.COLOR_ATTRIBUTE};
@@ -104,7 +104,6 @@ void main() {
         pongBuffer = FrameBuffer(Pixmap.Format.RGBA8888, FBO_WIDTH, FBO_HEIGHT, true)
         fboRegion = TextureRegion(sceneBuffer!!.colorBufferTexture)
         fboRegion!!.flip(false, true)
-        println(FBO_WIDTH)
     }
 
     fun renderToTexture(renderFunction: () -> Unit): TextureRegion? {

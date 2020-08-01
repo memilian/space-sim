@@ -15,9 +15,9 @@ import org.lwjgl.opengl.GL40
 
 class StarFieldRenderer(private val polygonSpriteBatch: PolygonSpriteBatch, private val orthoCamera: OrthographicCamera, private val fixedBatch: FixedStarBatch, private val initialWidth: Float, private val initialHeight: Float) : IRenderer {
 
-    var blur: BlurFx? = null
-    var originalScene: TextureRegion? = null
-    var blurredScene: TextureRegion? = null
+    lateinit var blur: BlurFx
+    private var originalScene: TextureRegion? = null
+    private var blurredScene: TextureRegion? = null
 
     init {
         init(true)
@@ -25,17 +25,16 @@ class StarFieldRenderer(private val polygonSpriteBatch: PolygonSpriteBatch, priv
 
     override fun init(firstInit: Boolean) {
         super.init(firstInit)
-        dispose()
         blur = BlurFx(orthoCamera, SpriteBatch(), initialWidth.toInt(), initialHeight.toInt())
-        blur!!.initialize()
-        originalScene = TextureRegion(blur!!.sceneBuffer!!.colorBufferTexture)
+        blur.initialize()
+        originalScene = TextureRegion(blur.sceneBuffer!!.colorBufferTexture)
         originalScene!!.flip(false, true)
     }
 
     var scale = 1f
     var position = Vector3()
     override fun renderToFramebuffer(camera: Camera) {
-        blurredScene = blur!!.renderToTexture {
+        blurredScene = blur.renderToTexture {
             fixedBatch.render(camera, scale, position)
         }
     }

@@ -13,15 +13,13 @@ import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.math.*
 import com.badlogic.gdx.math.collision.Ray
-import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.kotcrab.vis.ui.widget.VisWindow
+import ktx.app.use
 import ktx.assets.disposeSafely
+import ktx.graphics.use
 import ktx.math.times
-import nebulae.data.GameObject
-import nebulae.data.Octree
-import nebulae.data.Star
-import nebulae.data.System
+import nebulae.data.*
 import nebulae.generation.Settings
 import nebulae.generation.GalaxyGenerator
 import nebulae.input.BoundedCameraInputController
@@ -33,11 +31,17 @@ import nebulae.rendering.*
 import nebulae.rendering.renderers.*
 import nebulae.selection.Selection
 import nebulae.universe.Universe
+import org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB
+import org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER_SRGB
+import org.lwjgl.opengl.GL40
 
 const val SKYBOX_SIZE = 2048f;
 
 class GenerationScene(private val generator: GalaxyGenerator, val universe: Universe) : VisWindow("") {
 
+
+    private var backBuffer = FrameBuffer(Pixmap.Format.RGBA8888, width.toInt(), height.toInt(), true)
+    private var backBufferRegion = TextureRegion(backBuffer.colorBufferTexture)
     private val fontAndromeda = BitmapFont(Gdx.files.internal("fonts/andromeda.fnt"), true)
     private val fontCloseness = BitmapFont(Gdx.files.internal("fonts/closeness.fnt"), true)
     private val fontDiscognate = BitmapFont(Gdx.files.internal("fonts/discognate.fnt"), true)
@@ -62,8 +66,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private val builder = ModelBuilder()
     private val polygonSpriteBatch = PolygonSpriteBatch()
     private val spriteBatch = SpriteBatch()
-    private val cameraInputController = BoundedCameraInputController(camera, Rectangle())
-    private val multiplexer: InputMultiplexer by lazy { InputMultiplexer(stage, cameraInputController) }
+    val cameraInputController = BoundedCameraInputController(camera, Rectangle())
     private val stars = BufferedList<StarDecal>()
 
     private var focusedSelection: Selection<GameObject>? = null
@@ -87,6 +90,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private var starfieldRendererForSkybox: StarFieldRenderer? = null
     private var octreeRenderer: OctreeRenderer? = null
     private var starRenderer: StarRenderer? = null
+    private var planetRenderer: PlanetRenderer? = null
     private var selectionRenderer: SelectionRenderer? = null
     private var orbitRenderer: OrbitRenderer? = null
     private var debugRenderer: DebugRenderer? = null
@@ -104,6 +108,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 
     private fun initialize() {
 
+        backBufferRegion.flip(false, true)
+
         camera.position.set(150f, 150f, 150f)
         camera.up.set(0f, 0f, 1f)
         camera.near = 0.1f
@@ -111,8 +117,6 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         camera.lookAt(0f, 0f, 0f)
         camera.update()
 
-        setResizeBorder(10)
-        isResizable = true
         generator.generationFinished.clear()
         generator.generationFinished += { systemList ->
 
@@ -129,7 +133,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             starfieldRenderer = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, width, height)
             starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, 1024f, 1024f)
             octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
-            starRenderer = StarRenderer(modelBatch)
+            starRenderer = StarRenderer(polygonSpriteBatch, modelBatch, orthoCamera, width, height)
+            planetRenderer = PlanetRenderer(modelBatch)
             selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
             orbitRenderer = OrbitRenderer(modelBatch)
             debugRenderer = DebugRenderer(modelBatch)
@@ -147,6 +152,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         octreeRenderer?.init()
         selectionRenderer?.disposeSafely()
         selectionRenderer?.init()
+        planetRenderer?.disposeSafely()
+        planetRenderer?.init()
 
     }
 
@@ -177,44 +184,72 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             starfieldRenderer!!.renderToFramebuffer(camera)
             nebulaeRenderer!!.renderToFramebuffer(camera)
         }
+
+        starRenderer!!.renderToFramebuffer(camera)
         beginScene()
+        backBuffer.use {
+            val col = 0.0f
+            Gdx.gl.glClearColor(col, col, col, 1f)
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
-        val col = 0.0f
-        Gdx.gl.glClearColor(col, col, col, 1f)
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+            if (viewMode == ViewMode.GALAXY) {
+                starfieldRenderer!!.renderToScreen(camera)
+                nebulaeRenderer!!.renderToScreen(camera)
+            } else {
+                skyboxRenderer!!.renderToScreen(camera)
+            }
 
-        if (viewMode == ViewMode.GALAXY) {
-            starfieldRenderer!!.renderToScreen(camera)
-            nebulaeRenderer!!.renderToScreen(camera)
-            selectionRenderer!!.renderToScreen(camera)
-        } else {
-            skyboxRenderer!!.renderToScreen(camera)
+            if (focusedSelection?.item is System) {
+                @Suppress("UNCHECKED_CAST")
+                starRenderer!!.selection = focusedSelection as Selection<System>?
+                starRenderer!!.viewMode = viewMode
+                starRenderer!!.renderToScreen(camera)
+                @Suppress("UNCHECKED_CAST")
+                planetRenderer!!.selection = focusedSelection as Selection<System>?
+                planetRenderer!!.viewMode = viewMode
+                planetRenderer!!.renderToScreen(camera)
+            }
+            if (focusedSelection != null && focusedSelection!!.item is System) {
+                orbitRenderer!!.renderToScreen(camera);
+            }
+            if (viewMode == ViewMode.GALAXY) {
+                octreeRenderer!!.renderToScreen(camera)
+                selectionRenderer!!.renderToScreen(camera)
+            }
+
+
+            debugRenderer!!.renderToScreen(camera);
         }
 
-        if (focusedSelection?.item is System) {
-            @Suppress("UNCHECKED_CAST")
-            starRenderer!!.selection = focusedSelection as Selection<System>?
-            starRenderer!!.viewMode = viewMode
-            starRenderer!!.renderToScreen(camera)
+//        Gdx.gl.glEnable(GL40.GL_FRAMEBUFFER_SRGB)
+        polygonSpriteBatch.projectionMatrix = orthoCamera.combined
+        polygonSpriteBatch.use {
+            it.disableBlending()
+            it.draw(backBufferRegion, 0f, 0f)
+            it.flush()
         }
-        if (viewMode == ViewMode.GALAXY) {
-            octreeRenderer!!.renderToScreen(camera)
-        }
-        if (focusedSelection != null && focusedSelection!!.item is System) {
-            orbitRenderer!!.renderToScreen(camera);
-        }
-        debugRenderer!!.renderToScreen(camera);
+//        Gdx.gl.glDisable(GL40.GL_FRAMEBUFFER_SRGB)
         endScene(_batch)
     }
 
     private var ray: Ray? = null
-    var gameTime = 0f
+    var gameTime = 0.1
     override fun act(delta: Float) {
         super.act(delta)
         gameTime += delta
         if (viewMode == ViewMode.SYSTEM && focusedSelection?.item is System) {
             for (star in (focusedSelection!!.item as System).stars) {
-                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed))
+                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, AU_TO_SYSTEM))
+            }
+            for (planet in (focusedSelection!!.item as System).planets) {
+                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, AU_TO_SYSTEM))
+            }
+        } else if (viewMode == ViewMode.GALAXY && focusedSelection?.item is System) {
+            for (star in (focusedSelection!!.item as System).stars) {
+                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, 2.5))
+            }
+            for (planet in (focusedSelection!!.item as System).planets) {
+                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, 2.5))
             }
         }
 
@@ -231,12 +266,11 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             hoveredSelection!!.selectionTimer += delta.toLong()
         }
 
-        Gdx.input.inputProcessor = multiplexer
         cameraInputController.bounds.set(x, y, width, height)
         cameraInputController.autoRotate = Settings.debug.autoRotate
         cameraInputController.update()
         if (cameraInputController.isInBounds()) {
-            this.stage.unfocusAll()
+//            this.stage.unfocusAll()
 
             if (viewMode == ViewMode.GALAXY) {
                 pickStarSelection()
@@ -280,9 +314,10 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private fun pickStarSelection() {
         val mx = Gdx.input.x.toFloat()
         val my = Gdx.input.y.toFloat()
+        viewportScreen.setWorldSize(width, height)
         val sx = viewportScreen.screenX
         val sy = viewportScreen.screenY
-        ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.screenWidth.toFloat(), viewportScreen.screenHeight.toFloat())
+        ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.worldWidth.toFloat(), viewportScreen.worldHeight.toFloat())
 
         intersectingNodes.clear()
         generator.octree.intersect(ray!!, intersectingNodes)
@@ -419,6 +454,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         skyboxRenderer.disposeSafely()
         selectionRenderer.disposeSafely()
         starRenderer.disposeSafely()
+        planetRenderer.disposeSafely()
         debugRenderer.disposeSafely()
         orbitRenderer.disposeSafely()
 
@@ -445,8 +481,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
      * Restore viewport
      */
     private fun endScene(_batch: Batch) {
-        ScissorStack.popScissors()
-        stage.viewport.apply()
+//        ScissorStack.popScissors()
+//        stage.viewport.apply()
 
         restoreBatch(_batch);
     }
@@ -457,13 +493,13 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private fun beginScene() {
         val w = width.toInt() - 2
         val h = height.toInt() - 2
-        viewportScreen.update(w, h, false)
-        viewportScreen.setScreenBounds(x.toInt(), y.toInt(), w, h)
-        viewportScreen.apply()
+//        viewportScreen.update(w, h, false)
+//        viewportScreen.setScreenBounds(x.toInt(), y.toInt(), w, h)
+//        viewportScreen.apply()
 
-        val scissors = Rectangle()
-        ScissorStack.calculateScissors(stage.camera, identity, Rectangle(x + 1, y + 1, w.toFloat(), h.toFloat()), scissors)
-        ScissorStack.pushScissors(scissors)
+//        val scissors = Rectangle()
+//        ScissorStack.calculateScissors(stage.camera, identity, Rectangle(x + 1, y + 1, w.toFloat(), h.toFloat()), scissors)
+//        ScissorStack.pushScissors(scissors)
     }
 
     private fun suspendBatch(_batch: Batch) {
@@ -481,7 +517,19 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private fun handleResize() {
         if (needsResize) {
             starfieldRenderer!!.handleResize(width, height)
+            starRenderer!!.handleResize(width, height)
+            backBuffer.dispose()
+            backBuffer = FrameBuffer(Pixmap.Format.RGBA8888, width.toInt(), height.toInt(), true)
+            backBufferRegion.texture = backBuffer.colorBufferTexture
+            backBufferRegion.regionWidth = width.toInt()
+            backBufferRegion.regionHeight = height.toInt()
             needsResize = false
+            println("resized backbuffer to $width  $height")
+            for (camera in listOf<Camera>(camera, orthoCam, orthoCamera)) {
+                camera.viewportWidth = stage.viewport.worldWidth
+                camera.viewportHeight = stage.viewport.worldHeight
+                camera.update()
+            }
         }
     }
 }

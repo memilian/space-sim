@@ -19,14 +19,13 @@ interface ICelestialBody : GameObject {
     val bodyInfos: CelestialBodyInfo
 }
 
-
 data class CelestialBodyInfo(
         val system: System,
-        val orbitalParameters: OrbitalParameters,
-        val radius: Float,
-        val mass: Float,
-        val density: Float) {
-
+        var orbitalParameters: OrbitalParameters,
+        val radius: Double,
+        val mass: Double,
+        val density: Double,
+        val seed: Float) {
 
     fun toString(prefix: String): String {
         return """
@@ -40,14 +39,14 @@ data class CelestialBodyInfo(
     }
 }
 
-data class OrbitalParameters(val eccentricity: Float,
-                             val semiMajorAxis: Float,
-                             val inclination: Float,
-                             val ascendingNode: Float,
-                             val periapsisArg: Float,
-                             val meanAnomalyAtEpoch: Float,
-                             var trueAnomaly: Float,
-                             var period: Float,
+data class OrbitalParameters(val eccentricity: Double,
+                             var semiMajorAxis: Double,
+                             val inclination: Double,
+                             val ascendingNode: Double,
+                             val periapsisArg: Double,
+                             val meanAnomalyAtEpoch: Double,
+                             var trueAnomaly: Double,
+                             var period: Double,
                              var orbitingBody: ICelestialBody?) {
     fun toString(prefix: String): String {
         return """ orbiting ${when (orbitingBody == null) {
@@ -76,7 +75,8 @@ data class System(override val boundingBox: BoundingBox,
                   override var name: String,
                   val barycenter: Vector3,
                   val stars: List<Star>,
-                  val planets: List<Planet>
+                  val planets: List<Planet>,
+                  val seed: Float
 ) : GameObject {
     private fun toString(prefix: String): String {
         return """${prefix}System $name
@@ -92,7 +92,6 @@ data class System(override val boundingBox: BoundingBox,
         return toString("")
     }
 }
-
 
 data class Planet(override val boundingBox: BoundingBox,
                   override val position: Vector3,
@@ -131,7 +130,7 @@ data class Star(override val boundingBox: BoundingBox,
 
 /** other **/
 
-data class StarType(val spectralClass: SpectralClass, val luminosityClass: LuminosityClass, val temperature: Float, val luminosity: Float, val subClass: Int) {
+data class StarType(val spectralClass: SpectralClass, val luminosityClass: LuminosityClass, val temperature: Float, val luminosity: Double, val subClass: Int) {
     fun toString(prefix: String): String {
         return """$prefix${spectralClass.name}${subClass} ${luminosityClass.name} ${luminosityClass.className}
                  |$prefix   luminosity : $luminosity  temperature : ${temperature}K

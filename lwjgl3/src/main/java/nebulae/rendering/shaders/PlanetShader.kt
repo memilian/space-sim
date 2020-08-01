@@ -6,17 +6,17 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g3d.Renderable
 import com.badlogic.gdx.graphics.g3d.utils.RenderContext
+import nebulae.data.Planet
 import nebulae.data.Star
 import nebulae.generation.Settings
 
 
-class StarShader : ShaderBase("shaders/star.vert.glsl", "shaders/star.frag.glsl", mapOf(
+class PlanetShader : ShaderBase("shaders/planet.vert.glsl", "shaders/planet.frag.glsl", mapOf(
         "CAM_POS" to "u_CameraPosition",
         "CAM_DIR" to "u_CameraDirection",
         "FACTOR" to "u_Factor",
         "FREQUENCY" to "u_Frequency",
         "AMPLITUDE" to "u_Amplitude",
-        "SCALE" to "u_Scale",
         "TEMPERATURE" to "u_Temperature",
         "SPECTRUM" to "u_Spectrum"
 )) {
@@ -26,19 +26,14 @@ class StarShader : ShaderBase("shaders/star.vert.glsl", "shaders/star.frag.glsl"
     override fun render(renderable: Renderable) {
         super.render(renderable)
 
-        val star = renderable.userData as Star
-        program.setUniformf(locations["TEMPERATURE"]!!, star.type.temperature)
-        program.setUniformf(locations["SCALE"]!!, renderable.worldTransform.scaleX)
         Gdx.gl.glDisable(GL20.GL_BLEND)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
-        Gdx.gl.glDepthMask(true)
         Gdx.gl.glDepthFunc(GL20.GL_LESS)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
         Gdx.gl.glCullFace(GL20.GL_BACK)
         renderable.meshPart.render(program)
         renderable.meshPart.mesh.unbind(program)
         Gdx.gl.glCullFace(GL20.GL_FRONT)
-
     }
 
     override fun begin(camera: Camera, context: RenderContext) {
