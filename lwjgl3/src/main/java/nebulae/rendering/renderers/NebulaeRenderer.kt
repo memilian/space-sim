@@ -13,14 +13,16 @@ import ktx.app.use
 import ktx.assets.disposeSafely
 import ktx.graphics.use
 import nebulae.generation.Settings
+import nebulae.kutils.PNG
 import nebulae.rendering.shaders.NebulaeShaderSDF
 import org.lwjgl.opengl.GL40
 
 
-class NebulaeRenderer(private val spriteBatch: SpriteBatch, private val orthoCam: OrthographicCamera, private val modelBatch: ModelBatch, val camera: PerspectiveCamera, private val zoneRadius: Float) : IRenderer {
+class NebulaeRenderer(private val spriteBatch: SpriteBatch, private val orthoCam: OrthographicCamera, private val modelBatch: ModelBatch, val camera: PerspectiveCamera) : IRenderer {
 
+    var zoneRadius = 10f
     private lateinit var screenQuad: ModelInstance
-    private val nebulaShader: NebulaeShaderSDF = NebulaeShaderSDF(zoneRadius)
+    private val nebulaShader: NebulaeShaderSDF = NebulaeShaderSDF()
     private val framebufferNebulaes = FrameBuffer(Pixmap.Format.RGBA8888, 512, 512, false)
 
     private val nebulaesRegion = TextureRegion(framebufferNebulaes.colorBufferTexture, 512, 512)
@@ -33,7 +35,7 @@ class NebulaeRenderer(private val spriteBatch: SpriteBatch, private val orthoCam
         super.init(firstInit)
         nebulaesRegion.flip(false, true)
         nebulaShader.init()
-        val r = 1f;
+        val r = 1f
         val quad = ModelBuilder().createRect(-r, r, -1f, r, r, -1f, r, -r, -1f, -r, -r, -1f, 0f, 0f, 0f, Material(), (VertexAttributes.Usage.Position or VertexAttributes.Usage.TextureCoordinates).toLong())
         screenQuad = ModelInstance(quad)
     }

@@ -3,6 +3,7 @@ package nebulae.generation
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.math.collision.BoundingBox
+import kotlinx.coroutines.yield
 import kotlinx.event.event
 import ktx.math.div
 import ktx.math.plus
@@ -14,8 +15,9 @@ import java.lang.Float.min
 import kotlin.random.Random
 import java.lang.Math.PI
 
-import nebulae.data.SpectralClass.*;
-import nebulae.data.LuminosityClass.*;
+import nebulae.data.SpectralClass.*
+import nebulae.data.LuminosityClass.*
+import nebulae.lwjgl3.Lwjgl3Launcher
 import nebulae.orbital.computePosition
 import java.lang.Math.sin
 import kotlin.math.*
@@ -23,7 +25,7 @@ import kotlin.math.*
 class GalaxyGenerator(private val seed: Long = 123135464L) {
 
     private val systems = mutableListOf<System>()
-    val generationFinished = event<List<System>>()
+    lateinit var systemsIt: Iterator<System>
 
     var farthestStarDistance = 0f
 
@@ -33,13 +35,13 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
     val octree: Octree = Octree(BoundingBox(Vector3(-1000f, -1000f, -1000f), Vector3(1000f, 1000f, 1000f)), 0)
     var galaxy: Galaxy? = null
 
-    fun generate() {
+    fun initialize() {
         farthestStarDistance = 0f
         octree.dispose()
         systems.clear()
         galaxy?.arms?.clear()
         generateGalaxy()
-        generateStarSystems()
+        systemsIt = generateStarSystems()
     }
 
     private fun generateGalaxy() {
@@ -56,31 +58,35 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
     }
 
     private fun spiral(iterations: Int, a: Float, b: Float, w: Float): MutableList<Vector2> {
-        val armPoints = mutableListOf<Vector2>();
+        val armPoints = mutableListOf<Vector2>()
         for (t in 0..iterations) {
             armPoints.add(Vector2((a + b * t) * cos(w * t), ((a + b * t) * sin(w * t))))
         }
         return armPoints
     }
 
-    private fun generateStarSystems() {
-        val wanderDistance = Settings.generation.wanderDistance
-        val halfWander = wanderDistance * 0.5f
-        val halfWindow = Settings.generation.window * 0.5f
-        val candidates = mutableMapOf<Float, Vector3>()
-        val boundingBox = BoundingBox()
-        for (arm in galaxy!!.arms) {
-            for (point in arm) {
-                boundingBox.ext(point.toVector3(point.x))
+    private fun generateStarSystems(): Iterator<System> {
+        return iterator {
+            val wanderDistance = Settings.generation.wanderDistance
+            val halfWander = wanderDistance * 0.5f
+            val halfWindow = Settings.generation.window * 0.5f
+            val boundingBox = BoundingBox()
+            val candidates = mutableMapOf<Float, Vector3>()
+            val points = mutableListOf<Vector2>()
+            for (arm in galaxy!!.arms) {
+                for (point in arm) {
+                    boundingBox.ext(point.toVector3(point.x))
+                    points.add(point);
+                }
             }
-        }
-        boundingBox.ext(boundingBox.min.cpy().plus(-wanderDistance - Settings.generation.window - 300f))
-        boundingBox.ext(boundingBox.max.cpy().plus(wanderDistance + Settings.generation.window + 300f))
-        octree.bounds.set(boundingBox)
-        for (arm in galaxy!!.arms) {
-            for ((idx, point) in arm.withIndex()) {
-                val fromCenter = (idx + 1f) / arm.size
-                val deviationChance = 0.8f * fromCenter
+            points.sortBy { it.dst(0f, 0f) }
+            boundingBox.ext(boundingBox.min.cpy().plus(-wanderDistance - Settings.generation.window - 300f))
+            boundingBox.ext(boundingBox.max.cpy().plus(wanderDistance + Settings.generation.window + 300f))
+            octree.bounds.set(boundingBox)
+            val estimateMaxDist = points.last().dst(0f, 0f)
+            for (point in points) {
+                val fromCenter = point.dst(0f, 0f) / (estimateMaxDist + wanderDistance)
+                val deviationChance = 0.5f * fromCenter
                 val deviationDistance = 100.0f * fromCenter + rand.nextFloat() * 100f
                 for (t in 0..Settings.generation.starPerPoint) {
                     val deviate = rand.nextFloat() < deviationChance
@@ -107,7 +113,6 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                     if (toCenter > farthestStarDistance) {
                         farthestStarDistance = toCenter
                     }
-
 
                     val stars = mutableListOf<Star>()
                     val planets = mutableListOf<Planet>()
@@ -158,15 +163,15 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                         }
                     }
 
-                    system.name = stars[0].name + " (" + stars.size + ")";
+                    system.name = stars[0].name + " (" + stars.size + ")"
                     octree.insert(system)
-                    this.systems.add(system);
+                    systems.add(system)
                     candidates.clear()
+                    /// octree.printStats()
+                    yield(system)
                 }
             }
         }
-        octree.printStats()
-        generationFinished(systems)
     }
 
     private fun fixStarOrbitals(stars: MutableList<Star>) {
@@ -231,7 +236,7 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
         val density = rand.range(0.1, 20.0) // in g/cm3
         val mass = (4 / 3) * PI * radius.pow(3) * density * 1e12 // in kg
 
-        val eccentricityRng = rand.range(0.0001, 1.0);
+        val eccentricityRng = rand.range(0.0001, 1.0)
         val eccentricity = distribute(eccentricityRng)
         val orbitalParameters = OrbitalParameters(
                 eccentricity,

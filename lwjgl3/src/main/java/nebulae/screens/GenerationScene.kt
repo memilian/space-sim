@@ -14,6 +14,9 @@ import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.math.*
 import com.badlogic.gdx.math.collision.Ray
 import com.badlogic.gdx.utils.viewport.ScreenViewport
+import com.crashinvaders.vfx.VfxManager
+import com.crashinvaders.vfx.effects.BloomEffect
+import com.crashinvaders.vfx.effects.FxaaEffect
 import com.kotcrab.vis.ui.widget.VisWindow
 import ktx.app.use
 import ktx.assets.disposeSafely
@@ -35,7 +38,7 @@ import org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB
 import org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER_SRGB
 import org.lwjgl.opengl.GL40
 
-const val SKYBOX_SIZE = 2048f;
+const val SKYBOX_SIZE = 2048f
 
 class GenerationScene(private val generator: GalaxyGenerator, val universe: Universe) : VisWindow("") {
 
@@ -67,14 +70,16 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private val polygonSpriteBatch = PolygonSpriteBatch()
     private val spriteBatch = SpriteBatch()
     val cameraInputController = BoundedCameraInputController(camera, Rectangle())
-    private val stars = BufferedList<StarDecal>()
+
+    val vfx = VfxManager(Pixmap.Format.RGBA8888)
+    val bloom = BloomEffect()
 
     private var focusedSelection: Selection<GameObject>? = null
         set(value) {
             cameraInputController.desiredTarget = value?.item!!.position.cpy()
-            selectionRenderer?.focusedSelection = value
+            selectionRenderer.focusedSelection = value
             if (value.item is System) {
-                orbitRenderer?.createOrbits(value.item.let { it.stars + it.planets }.map { it.bodyInfos })
+                orbitRenderer.createOrbits(value.item.let { it.stars + it.planets }.map { it.bodyInfos })
             }
             println("Selected " + value.item)
             field = value
@@ -84,16 +89,16 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private val focusedNeighbors = mutableListOf<System>()
     private val focusedNeighborsConnections = mutableListOf<ModelInstance>()
 
-    private var nebulaeRenderer: NebulaeRenderer? = null
-    private var skyboxRenderer: SkyboxRenderer? = null
-    private var starfieldRenderer: StarFieldRenderer? = null
-    private var starfieldRendererForSkybox: StarFieldRenderer? = null
-    private var octreeRenderer: OctreeRenderer? = null
-    private var starRenderer: StarRenderer? = null
-    private var planetRenderer: PlanetRenderer? = null
-    private var selectionRenderer: SelectionRenderer? = null
-    private var orbitRenderer: OrbitRenderer? = null
-    private var debugRenderer: DebugRenderer? = null
+    private lateinit var nebulaeRenderer: NebulaeRenderer
+    private lateinit var skyboxRenderer: SkyboxRenderer
+    private lateinit var starfieldRenderer: StarFieldRenderer
+    private lateinit var starfieldRendererForSkybox: StarFieldRenderer
+    private lateinit var octreeRenderer: OctreeRenderer
+    private lateinit var starRenderer: StarRenderer
+    private lateinit var planetRenderer: PlanetRenderer
+    private lateinit var selectionRenderer: SelectionRenderer
+    private lateinit var orbitRenderer: OrbitRenderer
+    private lateinit var debugRenderer: DebugRenderer
 
     private var intersectingNodes: MutableList<Octree> = mutableListOf()
 
@@ -108,6 +113,9 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 
     private fun initialize() {
 
+        vfx.addEffect(bloom)
+        vfx.addEffect(FxaaEffect())
+
         backBufferRegion.flip(false, true)
 
         camera.position.set(150f, 150f, 150f)
@@ -117,48 +125,31 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         camera.lookAt(0f, 0f, 0f)
         camera.update()
 
-        generator.generationFinished.clear()
-        generator.generationFinished += { systemList ->
 
-            stars.clear()
-            systemList.forEach() {
-                val decal = StarDecal(it.stars[0], 0.94f)
-                stars.add(decal)
-            }
-            stars.update()
-            fixedBatch.set(stars)
-
-            nebulaeRenderer = NebulaeRenderer(spriteBatch, orthoCam, modelBatch, camera, generator.farthestStarDistance)
-            skyboxRenderer = SkyboxRenderer(modelBatch)
-            starfieldRenderer = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, width, height)
-            starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, 1024f, 1024f)
-            octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
-            starRenderer = StarRenderer(polygonSpriteBatch, modelBatch, orthoCamera, width, height)
-            planetRenderer = PlanetRenderer(modelBatch)
-            selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
-            orbitRenderer = OrbitRenderer(modelBatch)
-            debugRenderer = DebugRenderer(modelBatch)
-        }
-
-        skyboxRenderer?.disposeSafely()
-        skyboxRenderer?.init()
-        nebulaeRenderer?.disposeSafely()
-        nebulaeRenderer?.init()
-        starfieldRenderer?.disposeSafely()
-        starfieldRenderer?.init()
-        starfieldRendererForSkybox?.disposeSafely()
-        starfieldRendererForSkybox?.init()
-        octreeRenderer?.disposeSafely()
-        octreeRenderer?.init()
-        selectionRenderer?.disposeSafely()
-        selectionRenderer?.init()
-        planetRenderer?.disposeSafely()
-        planetRenderer?.init()
+        nebulaeRenderer = NebulaeRenderer(spriteBatch, orthoCam, modelBatch, camera)
+        skyboxRenderer = SkyboxRenderer(modelBatch)
+        starfieldRenderer = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, width, height)
+        starfieldRendererForSkybox = StarFieldRenderer(polygonSpriteBatch, orthoCamera, fixedBatch, 1024f, 1024f)
+        octreeRenderer = OctreeRenderer(intersectingNodes, modelBatch)
+        starRenderer = StarRenderer(modelBatch)
+        planetRenderer = PlanetRenderer(modelBatch)
+        selectionRenderer = SelectionRenderer(camera, orthoCam, decalBatch, modelBatch, fontAndromeda)
+        orbitRenderer = OrbitRenderer(modelBatch)
+        debugRenderer = DebugRenderer(modelBatch)
 
     }
 
+    private fun updateGeneration() {
+        val it = generator.systemsIt
+        for (i in 0 until 250) {
+            if (it.hasNext()) {
+                fixedBatch.add(StarDecal(it.next().stars[0], 0.94f))
+                nebulaeRenderer.zoneRadius = generator.farthestStarDistance
+            }
+        }
+    }
 
-    private val identity = Matrix4().idt()
+
     override fun draw(_batch: Batch?, parentAlpha: Float) {
         super.draw(_batch, parentAlpha)
         handleResize()
@@ -172,20 +163,19 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 
         if (skyboxNeedsUpdate) {
             renderSkybox(focusedSelection!!.item)
-            skyboxRenderer!!.textures = skyboxTextures
+            skyboxRenderer.textures = skyboxTextures
             skyboxNeedsUpdate = false
         }
 
         if (viewMode == ViewMode.GALAXY) {
             if (focusedSelection != null) {
-                starfieldRenderer!!.scale = 1f + 8 * camera.position.dst(focusedSelection!!.item.position).smoothstep(10f, 0f)
-                starfieldRenderer!!.position = focusedSelection!!.item.position
+                starfieldRenderer.scale = 1f + 8 * camera.position.dst(focusedSelection!!.item.position).smoothstep(10f, 0f)
+                starfieldRenderer.position = focusedSelection!!.item.position
             }
-            starfieldRenderer!!.renderToFramebuffer(camera)
-            nebulaeRenderer!!.renderToFramebuffer(camera)
+            starfieldRenderer.renderToFramebuffer(camera)
+            nebulaeRenderer.renderToFramebuffer(camera)
         }
 
-        starRenderer!!.renderToFramebuffer(camera)
         beginScene()
         backBuffer.use {
             val col = 0.0f
@@ -193,63 +183,77 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
             if (viewMode == ViewMode.GALAXY) {
-                starfieldRenderer!!.renderToScreen(camera)
-                nebulaeRenderer!!.renderToScreen(camera)
+                starfieldRenderer.renderToScreen(camera)
+                nebulaeRenderer.renderToScreen(camera)
             } else {
-                skyboxRenderer!!.renderToScreen(camera)
+                skyboxRenderer.renderToScreen(camera)
             }
 
             if (focusedSelection?.item is System) {
                 @Suppress("UNCHECKED_CAST")
-                starRenderer!!.selection = focusedSelection as Selection<System>?
-                starRenderer!!.viewMode = viewMode
-                starRenderer!!.renderToScreen(camera)
+                starRenderer.selection = focusedSelection as Selection<System>?
+                starRenderer.viewMode = viewMode
+                starRenderer.renderToScreen(camera)
                 @Suppress("UNCHECKED_CAST")
-                planetRenderer!!.selection = focusedSelection as Selection<System>?
-                planetRenderer!!.viewMode = viewMode
-                planetRenderer!!.renderToScreen(camera)
+                planetRenderer.selection = focusedSelection as Selection<System>?
+                planetRenderer.viewMode = viewMode
+                planetRenderer.renderToScreen(camera)
             }
             if (focusedSelection != null && focusedSelection!!.item is System) {
-                orbitRenderer!!.renderToScreen(camera);
-            }
-            if (viewMode == ViewMode.GALAXY) {
-                octreeRenderer!!.renderToScreen(camera)
-                selectionRenderer!!.renderToScreen(camera)
+                orbitRenderer.renderToScreen(camera);
             }
 
+            debugRenderer.renderToScreen(camera);
+        }
 
-            debugRenderer!!.renderToScreen(camera);
+        bloom.baseIntensity = Settings.graphics.baseIntensity
+        bloom.baseSaturation = Settings.graphics.baseSaturation
+        bloom.blurAmount = Settings.graphics.blurAmount
+        bloom.blurPasses = Settings.graphics.blurPasses
+        bloom.threshold = Settings.graphics.threshold
+        bloom.bloomIntensity = Settings.graphics.bloomIntensity
+        bloom.bloomSaturation = Settings.graphics.bloomSaturation
+        vfx.useAsInput(backBufferRegion.texture)
+        vfx.applyEffects()
+        vfx.renderToScreen()
+        if (viewMode == ViewMode.GALAXY) {
+            octreeRenderer.renderToScreen(camera)
+            selectionRenderer.renderToScreen(camera)
         }
 
 //        Gdx.gl.glEnable(GL40.GL_FRAMEBUFFER_SRGB)
-        polygonSpriteBatch.projectionMatrix = orthoCamera.combined
-        polygonSpriteBatch.use {
-            it.disableBlending()
-            it.draw(backBufferRegion, 0f, 0f)
-            it.flush()
-        }
+        orthoCamera.setToOrtho(false, width, height)
+        orthoCamera.update()
+//        polygonSpriteBatch.projectionMatrix = orthoCamera.combined
+//        polygonSpriteBatch.use {
+//            it.disableBlending()
+//            it.draw(backBufferRegion, 0f, 0f)
+//            it.flush()
+//        }
 //        Gdx.gl.glDisable(GL40.GL_FRAMEBUFFER_SRGB)
         endScene(_batch)
     }
+
 
     private var ray: Ray? = null
     var gameTime = 0.1
     override fun act(delta: Float) {
         super.act(delta)
-        gameTime += delta
+        updateGeneration()
+        gameTime += delta * Settings.game.timeSpeed
         if (viewMode == ViewMode.SYSTEM && focusedSelection?.item is System) {
             for (star in (focusedSelection!!.item as System).stars) {
-                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, AU_TO_SYSTEM))
+                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime, AU_TO_SYSTEM))
             }
             for (planet in (focusedSelection!!.item as System).planets) {
-                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, AU_TO_SYSTEM))
+                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime, AU_TO_SYSTEM))
             }
         } else if (viewMode == ViewMode.GALAXY && focusedSelection?.item is System) {
             for (star in (focusedSelection!!.item as System).stars) {
-                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, 2.5))
+                star.position.set(computePosition(star.bodyInfos.orbitalParameters, gameTime, 2.5))
             }
             for (planet in (focusedSelection!!.item as System).planets) {
-                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime * Settings.game.timeSpeed, 2.5))
+                planet.position.set(computePosition(planet.bodyInfos.orbitalParameters, gameTime, 2.5))
             }
         }
 
@@ -285,6 +289,12 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             } else if (viewMode == ViewMode.SYSTEM) {
                 if (Gdx.input.isKeyJustPressed(Input.Keys.BACKSPACE)) {
                     switchToGalaxyView()
+                }
+                if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+                    if (focusedSelection?.item is System) {
+                        val system = focusedSelection!!.item as System
+                        cameraInputController.target = system.planets.random().position
+                    }
                 }
             }
         }
@@ -347,9 +357,9 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         }
         if (selection != null) {
             hoveredSelection = Selection(selection)
-            selectionRenderer!!.hoveredSelection = hoveredSelection
+            selectionRenderer.hoveredSelection = hoveredSelection
         } else {
-            selectionRenderer!!.hoveredSelection = null
+            selectionRenderer.hoveredSelection = null
         }
 
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
@@ -396,7 +406,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     }
 
     private fun renderSkybox(obj: GameObject) {
-        val cam = PerspectiveCamera(90f, SKYBOX_SIZE, SKYBOX_SIZE);
+        val cam = PerspectiveCamera(90f, SKYBOX_SIZE, SKYBOX_SIZE)
         cam.position.set(obj.position)
         cam.update()
         val directions = listOf(
@@ -418,8 +428,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
                 else -> Vector3.Z
             })
             cam.update()
-            starfieldRendererForSkybox!!.renderToFramebuffer(cam)
-            nebulaeRenderer!!.renderToFramebuffer(cam)
+            starfieldRendererForSkybox.renderToFramebuffer(cam)
+            nebulaeRenderer.renderToFramebuffer(cam)
 //            oc.setToOrtho(true, fbs[i].width.toFloat(), fbs[i].height.toFloat())
 //            oc.update()
 //            sb.projectionMatrix = oc.combined
@@ -427,8 +437,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             fbs[i].begin()
             Gdx.gl20.glClearColor(0f, 0f, 0f, 1f)
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-            starfieldRendererForSkybox!!.renderToScreen(cam)
-            nebulaeRenderer!!.renderToScreen(cam)
+            starfieldRendererForSkybox.renderToScreen(cam)
+            nebulaeRenderer.renderToScreen(cam)
 
 //            sb.use {
 //                val scale = 0.5f
@@ -442,7 +452,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
             for (fb in fbs) {
                 val region = TextureRegion(fb.colorBufferTexture)
                 region.flip(true, true)
-                skyboxTextures.add(region);
+                skyboxTextures.add(region)
             }
         }
     }
@@ -458,7 +468,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         debugRenderer.disposeSafely()
         orbitRenderer.disposeSafely()
 
-        decalBatch.disposeSafely();
+        decalBatch.disposeSafely()
         polygonSpriteBatch.disposeSafely()
         fixedBatch.disposeSafely()
         modelBatch.disposeSafely()
@@ -466,7 +476,6 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         starTexturePre.texture.dispose()
         pixelTexture.texture.dispose()
         generator.octree.disposeSafely()
-        stars.clear()
 
         Gdx.input.inputProcessor = stage
         return super.remove()
@@ -484,7 +493,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 //        ScissorStack.popScissors()
 //        stage.viewport.apply()
 
-        restoreBatch(_batch);
+        restoreBatch(_batch)
     }
 
     /**
@@ -516,8 +525,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
 
     private fun handleResize() {
         if (needsResize) {
-            starfieldRenderer!!.handleResize(width, height)
-            starRenderer!!.handleResize(width, height)
+            starfieldRenderer.handleResize(width, height)
+            starRenderer.handleResize(width, height)
             backBuffer.dispose()
             backBuffer = FrameBuffer(Pixmap.Format.RGBA8888, width.toInt(), height.toInt(), true)
             backBufferRegion.texture = backBuffer.colorBufferTexture
@@ -530,13 +539,14 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
                 camera.viewportHeight = stage.viewport.worldHeight
                 camera.update()
             }
+            vfx.resize(width.toInt(), height.toInt())
         }
     }
 }
 
-class StarDecal(val star: Star, val size: Float) {
+class StarDecal(private val star: Star, val size: Float) {
     companion object {
-        val SIZE = 4
+        const val SIZE = 4
     }
 
     val vertices = FloatArray(SIZE)

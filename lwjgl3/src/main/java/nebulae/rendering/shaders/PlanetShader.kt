@@ -17,6 +17,7 @@ class PlanetShader : ShaderBase("shaders/planet.vert.glsl", "shaders/planet.frag
         "FACTOR" to "u_Factor",
         "FREQUENCY" to "u_Frequency",
         "AMPLITUDE" to "u_Amplitude",
+        "SEED" to "u_Seed",
         "TEMPERATURE" to "u_Temperature",
         "SPECTRUM" to "u_Spectrum"
 )) {
@@ -25,7 +26,8 @@ class PlanetShader : ShaderBase("shaders/planet.vert.glsl", "shaders/planet.frag
 
     override fun render(renderable: Renderable) {
         super.render(renderable)
-
+        val planet = renderable.userData as Planet
+        program.setUniformf(locations["SEED"]!!, planet.bodyInfos.seed)
         Gdx.gl.glDisable(GL20.GL_BLEND)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthFunc(GL20.GL_LESS)

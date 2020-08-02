@@ -14,8 +14,10 @@ import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.TimeUtils
 import ktx.assets.disposeSafely
+import ktx.math.div
 import ktx.math.times
 import nebulae.data.*
+import nebulae.kutils.minus
 import nebulae.kutils.plus
 import nebulae.kutils.smoothstep
 import nebulae.rendering.shaders.PlanetShader
@@ -63,12 +65,11 @@ class PlanetRenderer(private val modelBatch: ModelBatch) : IRenderer {
                 println("[Error] not enough model instances");
                 break
             }
-            modelBatch.begin(camera)
             val systemPos = selection!!.item.position
             val dst = systemPos.dst(camera.position)
             val radius = planet.bodyInfos.radius * KM_TO_AU
             val scale = when (viewMode) {
-                ViewMode.GALAXY -> max(0.5, min(radius, 10.0))
+                ViewMode.GALAXY -> max(0.2, min(radius * 0.1, 1.0))
                 ViewMode.SYSTEM -> max(1.0, radius * AU_TO_SYSTEM)
             }.toFloat()
             model.userData = planet
@@ -77,12 +78,21 @@ class PlanetRenderer(private val modelBatch: ModelBatch) : IRenderer {
                 tmp2.set(planet.position)
 
                 val sc = min(dst.smoothstep(10f, 5f), TimeUtils.timeSinceMillis(selection!!.selectionTimer).toFloat().smoothstep(0f, 100f))
-                model.transform = tmpMat.idt().translate(tmp + tmp2 * 0.1f).scale(scale * sc, scale * sc, scale * sc)
+                model.transform = tmpMat.idt().translate(tmp + tmp2 * 0.125f).scale(scale * sc, scale * sc, scale * sc)
             } else {
                 model.transform = tmpMat.idt().translate(planet.position).scale(scale, scale, scale)
             }
+            model.userData = planet;
+            modelBatch.begin(camera)
             modelBatch.render(model, planetShader)
             modelBatch.end()
+            if (viewMode == ViewMode.SYSTEM) { // render upscaled sphere so that planets are visible when zoomed out
+                modelBatch.begin(camera)
+                val sc = (tmp.set(camera.position).dst(planet.position)) / 80
+                model.transform = tmpMat.idt().translate(planet.position).scale(sc, sc, sc)
+                modelBatch.render(model)
+                modelBatch.end()
+            }
         }
     }
 

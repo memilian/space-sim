@@ -20,6 +20,8 @@ import org.lwjgl.opengl.GLUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 class CoronaeShader : ShaderBase("shaders/coronae.vert.glsl", "shaders/coronae.frag.glsl", mapOf(
         "CENTER" to "u_Center",
@@ -39,7 +41,8 @@ class CoronaeShader : ShaderBase("shaders/coronae.vert.glsl", "shaders/coronae.f
     override fun render(renderable: Renderable) {
         super.render(renderable)
 
-        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDepthMask(false)
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendEquation(GL20.GL_FUNC_ADD)
         Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE_MINUS_SRC_COLOR)
@@ -57,7 +60,8 @@ class CoronaeShader : ShaderBase("shaders/coronae.vert.glsl", "shaders/coronae.f
         program.setUniformf(locations["SIZE"]!!, size)
         program.setUniformf(locations["SEED"]!!, seed)
         camera.view.getRotation(tmpQuat)
-        tmpVec.set(abs(tmpQuat.yawRad), abs(tmpQuat.pitchRad), abs(tmpQuat.rollRad))
+        tmpQuat.nor()
+        tmpVec.set(abs(cos(tmpQuat.yawRad * 2)), abs(sin(tmpQuat.pitchRad * 2)), abs(cos(tmpQuat.rollRad * 2)))
         program.setUniformf(locations["ROTATION"]!!, tmpVec)
         program.setUniformf(locations["TEMPERATURE"]!!, temperature)
         temperatureColors.bind(0)

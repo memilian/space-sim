@@ -6,9 +6,9 @@ import com.badlogic.gdx.graphics.Mesh.VertexDataType
 import com.badlogic.gdx.graphics.glutils.ShaderProgram
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
+import com.badlogic.gdx.utils.BufferUtils
 import com.badlogic.gdx.utils.Disposable
 import ktx.assets.disposeSafely
-import ktx.math.times
 import nebulae.generation.Settings
 import nebulae.screens.StarDecal
 import org.lwjgl.opengl.GL32
@@ -16,38 +16,47 @@ import org.lwjgl.opengl.GL40
 import java.lang.Integer.min
 import kotlin.math.floor
 
-class FixedStarBatch() : Disposable {
+class FixedStarBatch : Disposable {
+
     private var meshes = mutableListOf<Mesh>()
     private var shader: ShaderProgram? = null
-    private var size = 0;
     private val temperatureColors = Texture(Gdx.files.internal("textures/star_spectrum.png"))
 
-    fun set(decals: List<StarDecal>) {
-        disposeMeshes()
-        disposeShader()
+    private var lastMeshDecalCount = 0
+    private lateinit var lastMesh: Mesh
+
+    private val maxVerticesPerMesh = 32000f
+    private val maxDecalsPerMesh = floor(maxVerticesPerMesh / StarDecal.SIZE).toInt()
+
+    init {
         createDefaultShader()
-        size = decals.size
+        createMesh()
+    }
+
+
+    private fun createMesh() {
         var vertexDataType = VertexDataType.VertexArray
         if (Gdx.gl30 != null) {
             vertexDataType = VertexDataType.VertexBufferObjectWithVAO
         }
-        val maxPerBatch = floor(32000f / StarDecal.SIZE).toInt()
-        var pos = 0
-        while (pos < decals.size) {
-            val count = min(decals.size - pos, maxPerBatch)
-            val list = decals.subList(pos, pos + count)
-            pos += count
-            val mesh = Mesh(vertexDataType, true, list.size * 4, 0, VertexAttribute(
-                    VertexAttributes.Usage.Position, 3, ShaderProgram.POSITION_ATTRIBUTE), VertexAttribute(
-                    VertexAttributes.Usage.Generic, 1, "temperature"))
-            val vertices = FloatArray(list.size * StarDecal.SIZE)
-            for ((decalIndex, decal) in list.withIndex()) {
-                System.arraycopy(decal.vertices, 0, vertices, decalIndex * StarDecal.SIZE, StarDecal.SIZE)
-            }
-            mesh.setVertices(vertices);
-            meshes.add(mesh)
+        val mesh = Mesh(vertexDataType, false, maxDecalsPerMesh * StarDecal.SIZE, 0, VertexAttribute(
+                VertexAttributes.Usage.Position, 3, ShaderProgram.POSITION_ATTRIBUTE), VertexAttribute(
+                VertexAttributes.Usage.Generic, 1, "temperature"))
+        lastMesh = mesh
+        lastMeshDecalCount = 0;
+        meshes.add(mesh)
+    }
+
+    fun add(decal: StarDecal) {
+//        for (decal in decals) {
+        if (lastMeshDecalCount >= maxDecalsPerMesh) {
+            createMesh()
         }
-        println("Created ${meshes.size} meshes for ${decals.size} decals")
+        lastMesh.verticesBuffer.position(lastMeshDecalCount * StarDecal.SIZE)
+        BufferUtils.copy(decal.vertices, 0, lastMesh.verticesBuffer, StarDecal.SIZE)
+        lastMeshDecalCount++;
+//        }
+//        println("Created ${meshes.size} meshes for ${decals.size} decals")
     }
 
     private var transform: Matrix4 = Matrix4().idt()
@@ -61,7 +70,7 @@ class FixedStarBatch() : Disposable {
             transform.mul(tmpmat2).mul(tmpmat)
             Gdx.gl.glEnable(GL20.GL_BLEND)
             Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
-            Gdx.gl.glEnable(GL20.GL_VERTEX_PROGRAM_POINT_SIZE);
+            Gdx.gl.glEnable(GL20.GL_VERTEX_PROGRAM_POINT_SIZE)
             Gdx.gl.glHint(GL40.GL_POINT_SMOOTH_HINT, GL40.GL_NICEST)
             Gdx.gl.glEnable(GL32.GL_POINT_SMOOTH)
             shader!!.begin()
@@ -72,14 +81,18 @@ class FixedStarBatch() : Disposable {
             shader!!.setUniformf("u_pointSizeNear", Settings.graphics.pointSizeNear)
             shader!!.setUniformf("u_pointSizeFar", Settings.graphics.pointSizeFar)
             shader!!.setUniformf("u_distancePower", Settings.graphics.distancePower)
-            for (mesh in meshes) {
-                mesh.render(shader, GL20.GL_POINTS, 0, mesh.numVertices)
+            for ((index, mesh) in meshes.withIndex()) {
+                val count = if (index == meshes.size - 1) {
+                    lastMeshDecalCount * StarDecal.SIZE
+                } else {
+                    maxDecalsPerMesh
+                }
+                mesh.render(shader, GL20.GL_POINTS, 0, count)
             }
             shader!!.end()
             Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
             Gdx.gl.glDisable(GL20.GL_BLEND)
             Gdx.gl.glDisable(GL40.GL_POINT_SMOOTH)
-
         }
     }
 
@@ -127,8 +140,8 @@ class FixedStarBatch() : Disposable {
     }
 
     private fun disposeShader() {
-        val shad = shader;
-        shader = null;
+        val shad = shader
+        shader = null
         shad.disposeSafely()
     }
 
@@ -139,4 +152,6 @@ class FixedStarBatch() : Disposable {
             mesh.disposeSafely()
         }
     }
+
+
 }

@@ -11,7 +11,7 @@ import nebulae.generation.Settings
 import kotlin.math.tan
 
 
-class NebulaeShaderSDF(var zoneRadius: Float) : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
+class NebulaeShaderSDF() : ShaderBase("shaders/sdfnebula.vert.glsl", "shaders/sdfnebula.frag.glsl", mapOf(
         "CAM_POS" to "u_CameraPosition",
         "CAM_DIR" to "u_CameraDirection",
         "CENTER" to "u_Center",
@@ -24,7 +24,7 @@ class NebulaeShaderSDF(var zoneRadius: Float) : ShaderBase("shaders/sdfnebula.ve
         "SECONDARY_COLOR" to "u_SecondaryColor",
         "ZONE_RADIUS" to "u_ZoneRadius"
 )) {
-
+    var zoneRadius = 0f
     override fun render(renderable: Renderable) {
         super.render(renderable)
         Gdx.gl.glEnable(GL20.GL_BLEND)

@@ -52,7 +52,7 @@ class SkyboxRenderer(private val modelBatch: ModelBatch) : IRenderer {
         box.dispose()
     }
 
-    val directions = listOf(
+    private val directions = listOf(
             Vector3.Z.cpy().times(-1),
             Vector3.Z,
             Vector3.Y.cpy().times(-1),
@@ -93,6 +93,7 @@ class SkyboxRenderer(private val modelBatch: ModelBatch) : IRenderer {
         for (quad in quads) {
             quad.model.disposeSafely()
         }
+        quads.clear()
     }
 
 }

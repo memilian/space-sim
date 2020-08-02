@@ -25,12 +25,13 @@ void main()
     vec4 pos = vertexPos / SCALE;
     float timeScale = 0.55;
     vec4 color = texture2D(SPECTRUM, vec2(TEMPERATURE / 40000.0, 0.1));
-    float d1 = (0.5 + (0.5 * fbm(vec4(pos.xyz * 10.0, TIME * timeScale *  0.0003), 2)));
+    float d1 = (0.5 + (0.5 * fbm2(vec4(pos.xyz * 10.0, TIME * timeScale *  0.0003), 2)));
     float d2 = 0.5 + 0.5 * voronoise(vec4(pos.xyz * 10.0, TIME * timeScale *  0.0005), 0.5);
     float d3 = 0.5 + 0.5 * voronoise(vec4(pos.xzy * 40.0, TIME * timeScale *  0.0005), 0.5);
 
     fragColor.rgb =  color.rgb * (d1 + 0.25) * 0.5 * d3 * d2+ (d2*d3*d1) * 0.1;
     fragColor.rgb *= 1.0 +(1 - smoothstep(0, 40000, TEMPERATURE)) * 3;
     fragColor *= mix(1.2, 0.48, 1 - TEMPERATURE / 40000);
+    fragColor *= 3.0;
     fragColor.a = 1.0;
 }

@@ -11,17 +11,19 @@ import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
+import com.badlogic.gdx.utils.TimeUtils
 import ktx.assets.disposeSafely
 import ktx.math.times
-import nebulae.data.AU_TO_SYSTEM
-import nebulae.data.CelestialBodyInfo
-import nebulae.data.KM_TO_SYSTEM
-import nebulae.data.Octree
+import nebulae.data.*
 import nebulae.generation.Settings
 import nebulae.kutils.minus
+import nebulae.kutils.smoothstep
 import nebulae.orbital.computePosition
+import nebulae.screens.ViewMode
 import org.lwjgl.opengl.GL40
 import java.lang.Math.PI
+import kotlin.math.max
+import kotlin.math.min
 
 class OrbitRenderer(private val modelBatch: ModelBatch) : IRenderer {
 

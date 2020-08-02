@@ -47,6 +47,7 @@ class GenerationScreen(private val game: Nebulae, private val generator: GalaxyG
     }
 
     private fun initialize() {
+        generator.initialize()
         stage.addActor(scene)
         stage.addActor(window("Generation") {
             window = this
@@ -68,16 +69,15 @@ class GenerationScreen(private val game: Nebulae, private val generator: GalaxyG
                         multiplexer.addProcessor(scene.cameraInputController)
                         stage.addActor(scene)
                         resize(Gdx.graphics.width, Gdx.graphics.height)
-                        generator.generate()
+                        generator.initialize()
                     }
                 }
             }
             val scrollPane = ScrollPane(t, VisUI.getSkin(), "default")
             scrollPane.setScrollingDisabled(true, false)
             this.add(scrollPane).expand().fill()
+            multiplexer.addProcessor(scene.cameraInputController)
         })
-        multiplexer.addProcessor(scene.cameraInputController)
-        generator.generate()
     }
 
     override fun resize(width: Int, height: Int) {

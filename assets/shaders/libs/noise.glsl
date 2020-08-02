@@ -29,7 +29,7 @@ float fbm(in vec3 p, float fre)
     float res = 0.0, amp = 0.1, div = 0.0;
     for (int i = 0; i < 5; ++i)
     {
-        res += amp * noise((p) * fre);
+        res += amp * noise((p + p * i) * fre);
         div += amp;
         amp *= 0.54;
         fre *= 1.7;
@@ -209,6 +209,23 @@ float noise(vec4 v){
 
 
 float fbm(in vec4 p, float fre)
+{
+    float res = 0.0, amp = 0.1, div = 0.0;
+    for (int i = 0; i < 5; ++i)
+    {
+        res += amp * noise((p + p * i) * fre);
+        div += amp;
+        amp *= 0.54;
+        fre *= 1.7;
+        p = p * 1.4;
+    }
+    res /= div;
+    return res;
+}
+
+
+//no position shifting
+float fbm2(in vec4 p, float fre)
 {
     float res = 0.0, amp = 0.1, div = 0.0;
     for (int i = 0; i < 5; ++i)

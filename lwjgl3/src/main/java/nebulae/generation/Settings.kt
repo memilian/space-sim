@@ -27,8 +27,30 @@ class Settings() {
     }
 
     class Graphics {
+        @Range(from = 0f, to = 10f, step = 0.1f)
+        var bloomSaturation = 0.85f
+
+        @Range(from = 0f, to = 10f, step = 0.1f)
+        var bloomIntensity = 1.1f
+
+        @Range(from = 0f, to = 10f, step = 0.1f)
+        var threshold = 0.85f
+
+        @Range(from = 0f, to = 10f, step = 1f)
+        var blurPasses = 10
+
+        @Range(from = 0f, to = 10f, step = 1f)
+        var blurAmount = 0f
+
+        @Range(from = 0f, to = 10f, step = 0.1f)
+        var baseSaturation = 0.85f
+
+        @Range(from = 0f, to = 10f, step = 0.1f)
+        var baseIntensity = 1.0f
+
         @Range(from = 0f, to = 2f, step = 0.01f)
         var blurRadius = 1.3f
+
 
         @Range(from = 0f, to = 100f, step = 1f)
         var pointSizeNear = 7f
