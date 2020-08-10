@@ -3,8 +3,6 @@ package nebulae.generation
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.math.collision.BoundingBox
-import kotlinx.coroutines.yield
-import kotlinx.event.event
 import ktx.math.div
 import ktx.math.plus
 import ktx.math.times
@@ -17,9 +15,8 @@ import java.lang.Math.PI
 
 import nebulae.data.SpectralClass.*
 import nebulae.data.LuminosityClass.*
-import nebulae.lwjgl3.Lwjgl3Launcher
 import nebulae.orbital.computePosition
-import java.lang.Math.sin
+import java.lang.IllegalStateException
 import kotlin.math.*
 
 class GalaxyGenerator(private val seed: Long = 123135464L) {
@@ -155,9 +152,10 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                     var lastPlanetDist = stars.last().bodyInfos.orbitalParameters.semiMajorAxis + stars.last().bodyInfos.radius * KM_TO_AU
                     val eclipticInclination = rand.range(-0.3, 0.3)
                     for (i in 0 until planetCount) {
-                        val planet = generatePlanet(system, lastPlanetDist, stars[0], eclipticInclination, i)
+                        val planetAndMoons = generatePlanetAndMoons(system, lastPlanetDist, stars[0], eclipticInclination, i)
+                        val planet = planetAndMoons[0]
                         lastPlanetDist = planet.bodyInfos.orbitalParameters.semiMajorAxis
-                        planets.add(planet)
+                        planets.addAll(planetAndMoons)
                         if (lastPlanetDist > 50f) {
                             break
                         }
@@ -195,8 +193,10 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                     rand.range(PI * 0.25, PI * 0.75), // might need to revise this range
                     rand.range(0.0, PI * 2),
                     0.0,
-                    PI * 2 * sqrt((semiMajorAxis * AU_TO_KM).pow(3) / (G_CONSTANT * (star.bodyInfos.mass + prevStar.bodyInfos.mass))), //TODO: add the other stars mass
-                    prevStar)
+                    PI * 2 * sqrt((semiMajorAxis * AU_TO_M).pow(3) / (G_CONSTANT * (star.bodyInfos.mass + prevStar.bodyInfos.mass))), //TODO: add the other stars mass
+                    prevStar,
+                    radius * (star.bodyInfos.mass / prevStar.bodyInfos.mass).pow(2.0 / 5.0)
+            )
             star.bodyInfos.orbitalParameters = orbitalParameters
             stars.add(wStars.removeAt(0))
             prevStar = star
@@ -215,39 +215,72 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
         return weightedPosSum / totalMass
     }
 
-    private fun generatePlanet(system: System, lastPlanetDist: Double, parent: ICelestialBody, eclipticInclination: Double, planetNumber: Int): Planet {
+    private fun generatePlanetAndMoons(system: System, lastPlanetDistAU: Double, parent: ICelestialBody, eclipticInclination: Double, planetNumber: Int, planetType: PlanetType? = null): List<Planet> {
 
 
-        val dist = lastPlanetDist + (0.1 + rand.nextFloat() * (lastPlanetDist.smoothstep(0.0, 10.0) * (planetNumber + 1)))
+        val distAU = lastPlanetDistAU + (0.1 + rand.nextFloat() * (lastPlanetDistAU.smoothstep(0.0, 10.0) * (planetNumber + 1)))
 
+        val planet = generateBody(planetType, distAU, eclipticInclination, parent, system)
+        val planets = mutableListOf<Planet>()
+        planets.add(planet)
+
+        var moonProba = 0.35f
+        while (rand.nextFloat() < moonProba) {
+            val maxRadius = planet.bodyInfos.radius * 0.3
+            val minRadius = planet.bodyInfos.radius * 0.05
+            val radius = rand.range(minRadius, maxRadius)
+            val soi = planet.bodyInfos.orbitalParameters.soiRadius
+            val distAu = rand.range((radius + planet.bodyInfos.radius) * KM_TO_AU + 0.1 * soi, soi)
+            val moon = generateBody(PlanetType.ROCKY, distAu, eclipticInclination, planet, system, radius)
+            planets.add(moon)
+            moonProba *= 0.8f
+        }
+        return planets
+    }
+
+    private fun generateBody(planetType: PlanetType?, distAU: Double, eclipticInclination: Double, parent: ICelestialBody, system: System, definedRadius: Double? = null): Planet {
         //size based on https://en.wikipedia.org/wiki/Terrestrial_planet#/media/File:Size_of_Kepler_Planet_Candidates.jpg
         val sizeRange = rand.nextFloat()
         val radius = when {
-            sizeRange < 0.03f -> rand.nextInt(98000, 130000)
-            sizeRange < 0.1f -> rand.nextInt(39000, 98000)
-            sizeRange < 0.3f -> rand.nextInt(2000, 8000)
-            sizeRange < 0.6f -> rand.nextInt(8000, 13000)
-            else -> rand.nextInt(13000, 39000)
-        }.toDouble()
+            definedRadius != null -> definedRadius
+            sizeRange < 0.03f -> round(rand.range(98000.0, 130000.0))
+            sizeRange < 0.1f -> round(rand.range(39000.0, 98000.0))
+            sizeRange < 0.3f -> round(rand.range(2000.0, 8000.0))
+            sizeRange < 0.6f -> round(rand.range(8000.0, 13000.0))
+            else -> round(rand.range(13000.0, 39000.0))
+        }
 
-        val type = if (sizeRange > 0.6f || rand.nextFloat() < min(0.75f, 0.5f * log((dist.toFloat() + 0.5f) / 50f, 1f) + 1)) PlanetType.GASEOUS else PlanetType.ROCKY
+        val type = when (planetType) {
+            null -> if (sizeRange > 0.6f || rand.nextFloat() < min(0.75f, 0.5f * log((distAU.toFloat() + 0.5f) / 50f, 1f) + 1)) {
+                PlanetType.GASEOUS
+            } else {
+                PlanetType.ROCKY
+            }
+            else -> planetType
+        }
+
+
+        //TODO add temperature https://astronomy.stackexchange.com/questions/10113/how-to-calculate-the-expected-surface-temperature-of-a-planet
 
         //TODO: ensure consistency with planet type
         val density = rand.range(0.1, 20.0) // in g/cm3
+
         val mass = (4 / 3) * PI * radius.pow(3) * density * 1e12 // in kg
 
         val eccentricityRng = rand.range(0.0001, 1.0)
         val eccentricity = distribute(eccentricityRng)
         val orbitalParameters = OrbitalParameters(
                 eccentricity,
-                dist,
+                distAU,
                 rand.range(0.1f, 0.1f) + eclipticInclination,
                 rand.range(0.0, PI * 2),
                 rand.range(PI * 0.25, PI * 0.75), // might need to revise this range
                 rand.range(0.0, PI * 2),
                 0.0,
-                PI * 2 * sqrt((dist * AU_TO_M).pow(3) / (G_CONSTANT * (mass + parent.bodyInfos.mass))),
-                parent)
+                PI * 2 * sqrt((distAU * AU_TO_M).pow(3) / (G_CONSTANT * (mass + parent.bodyInfos.mass))),
+                parent,
+                distAU * (mass / parent.bodyInfos.mass).pow(2.0 / 5.0)
+        )
         if (orbitalParameters.period.isInfinite() || orbitalParameters.period.isNaN()) {
             println("beyond infinity :(")
         }
@@ -319,7 +352,9 @@ class GalaxyGenerator(private val seed: Long = 123135464L) {
                 rand.range(0.0, Math.PI * 2),
                 0.0,
                 PI * 2 * sqrt((semiMajorAxis * AU_TO_KM).pow(3) / (G_CONSTANT * (massKg))), //TODO: add the other stars mass
-                null)
+                null,
+                1000.0
+        )
 
         val bodyInfos = CelestialBodyInfo(system, orbitalParameters, radiusKm, massKg, density, rand.nextFloat())
 

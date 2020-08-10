@@ -67,8 +67,10 @@ class SkyboxRenderer(private val modelBatch: ModelBatch) : IRenderer {
 
             Gdx.gl.glClearColor(0f, 0f, 0f, 0f)
             Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT or GL20.GL_COLOR_BUFFER_BIT)
+            Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
+            Gdx.gl.glDepthMask(false)
             val pos = camera.position
-            val world = tmpMat.idt().setToTranslationAndScaling(pos.x, pos.y, pos.z, 5500f, 5500f, 5500f)
+            val world = tmpMat.idt().setToTranslationAndScaling(pos.x, pos.y, pos.z, 55000f, 55000f, 55000f)
             for (i in 0 until 6) {
                 val quad = quads[i]
                 val texture = textures!![i]

@@ -4,23 +4,21 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.InputAdapter
 import com.badlogic.gdx.graphics.Camera
-import com.badlogic.gdx.math.Interpolation
-import com.badlogic.gdx.math.MathUtils
-import com.badlogic.gdx.math.Rectangle
-import com.badlogic.gdx.math.Vector3
+import com.badlogic.gdx.math.*
+import com.badlogic.gdx.math.collision.BoundingBox
+import com.badlogic.gdx.math.collision.Ray
 import ktx.math.minus
 import ktx.math.plus
 import ktx.math.times
 import nebulae.kutils.setZ
 import java.lang.Float.max
 import java.lang.Float.min
-import kotlin.jvm.internal.Reflection
 import kotlin.math.*
-import kotlin.reflect.full.memberProperties
 
 class BoundedCameraInputController(private val camera: Camera, var bounds: Rectangle) : InputAdapter() {
 
 
+    var followTarget = false
     private val restrictPitch = false
     var target = Vector3()
     var desiredTarget: Vector3? = null
@@ -29,15 +27,15 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
             field = value
         }
 
-    val translateAmount: Float
-        get() = 60f * distanceFactor
-    val zoomAmount: Float
-        get() = 330f * distanceFactor
-    val rotateAmount = 360f
+    private val translateAmount: Float
+        get() = distanceFactor
+    private val zoomAmount: Float
+        get() = distanceFactor
+    private val rotateAmount = 360f
 
     var targetDistance = 100f
 
-    private var desiredDistance = targetDistance
+    private var zoomVelocity = targetDistance
     private var desiredTranslation = Vector3()
     private var desiredYaw = 0f
     private var desiredPitch = 50f
@@ -63,6 +61,8 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
     private var distanceFactor = 1.0f
     private var timer = 0f
     private val timeToFocusTarget = 2f;
+
+    private val ray = Ray()
 
     fun isMovingToTarget(): Boolean {
         return timer < timeToFocusTarget;
@@ -121,22 +121,19 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
             camera.translate(tmp1)
             desiredTranslation.scl(0.905f)
         }
-        if (abs(desiredDistance) > epsilon) {
-            var sc = desiredDistance * delta
-            val toTarget = tmp2.set(camera.position).dst(target)
-            if (toTarget < 5) {
-                if (toTarget < 1) {
-                    sc = toTarget - 0.5f
-                    if (sc.absoluteValue < 1.0 && sc != 0.0f) {
-                        sc = sc.sign
-                    }
-                }
-                if (desiredDistance > 0) {
-                    desiredDistance = 0f
-                }
+        if (abs(zoomVelocity) > epsilon) {
+            var sc = zoomVelocity * delta
+            tmp1.set(camera.direction).nor().scl(sc)
+            ray.direction.set(camera.direction)
+            ray.origin.set(camera.position)
+            Intersector.intersectRaySphere(ray, target, 0.5f, tmp2)
+            if (camera.position.dst(tmp2) < sc) {
+                sc = camera.position.dst(tmp2) * 0.5f
+                zoomVelocity = 0f
+            } else {
+                camera.translate(tmp1)
             }
-            camera.translate(tmp1.set(camera.direction).nor().scl(sc))
-            desiredDistance *= 0.95f
+            zoomVelocity *= 0.95f
         }
 
         if (desiredTarget != null) {
@@ -146,7 +143,11 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
                 desiredTarget = null
             }
             camera.translate(toTarget * progress)
-            target += toTarget
+            target += toTarget //TODO cleanup and correctly handle target tracking separately from this
+        }
+
+        if (followTarget) {
+            setTargetDistanceImmediate(targetDistance)
         }
 
         camera.lookAt(target)
@@ -156,18 +157,16 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
     }
 
     fun setTargetDistanceImmediate(dist: Float) {
-        val currentDistance = camera.position.dst(target);
+        this.targetDistance = dist
+        val currentDistance = camera.position.dst(target)
         camera.lookAt(target)
         camera.translate(tmp1.set(camera.direction).nor().scl(currentDistance - dist))
     }
 
     private fun updateDistanceFactor() {
-        val maxDistEffect = 500f
-        val minDistEffect = 10f
         val distanceToTarget = tmp2.set(camera.position).dst(target)
-        distanceFactor = max(minDistEffect, min(maxDistEffect, distanceToTarget)) / maxDistEffect
-        distanceFactor = max(0.01f, distanceFactor * distanceFactor)
-        distanceFactor = log10(distanceFactor * 5 + 1.0).toFloat()
+        distanceFactor = max(0.0f, distanceToTarget)
+        distanceFactor = log10(distanceToTarget * distanceToTarget + 2.0).toFloat() * distanceToTarget * 0.1f
     }
 
     override fun keyDown(keycode: Int): Boolean {
@@ -187,27 +186,32 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
             rightKey -> rightPressed = false
             upKey -> upPressed = false
             downKey -> downPressed = false
+            Input.Keys.F -> followTarget = !followTarget
         }
         return !isInBounds()
     }
 
-    override fun scrolled(amount: Int): Boolean {
+    override fun scrolled(dir: Int): Boolean {
         if (isInBounds()) {
-            desiredDistance -= amount * zoomAmount
+            var amount = dir
+            if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)) {
+                amount *= 10
+            }
+            if (followTarget) {
+                targetDistance += amount * zoomAmount * 0.1f
+            }
+            zoomVelocity -= amount * zoomAmount
         }
         return false
     }
-
 
     override fun touchDragged(screenX: Int, screenY: Int, pointer: Int): Boolean {
         val dx = (screenX - startX) / Gdx.graphics.width
         val dy = (screenY - startY) / Gdx.graphics.height
         startX = screenX.toFloat()
         startY = screenY.toFloat()
-//        if (pressedButton == Input.Buttons.RIGHT) {
         desiredYaw -= dx * rotateAmount
         desiredPitch -= dy * rotateAmount
-//        }
         return isInBounds()
     }
 
@@ -223,7 +227,7 @@ class BoundedCameraInputController(private val camera: Camera, var bounds: Recta
     }
 
     fun killScroll() {
-        desiredDistance = 0f
+        zoomVelocity = 0f
     }
 
     fun resetTimer() {

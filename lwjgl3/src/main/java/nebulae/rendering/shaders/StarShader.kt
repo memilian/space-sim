@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g3d.Renderable
 import com.badlogic.gdx.graphics.g3d.utils.RenderContext
 import nebulae.data.Star
 import nebulae.generation.Settings
+import org.lwjgl.opengl.GL40
 
 
 class StarShader : ShaderBase("shaders/star.vert.glsl", "shaders/star.frag.glsl", mapOf(
@@ -29,14 +30,19 @@ class StarShader : ShaderBase("shaders/star.vert.glsl", "shaders/star.frag.glsl"
         val star = renderable.userData as Star
         program.setUniformf(locations["TEMPERATURE"]!!, star.type.temperature)
         program.setUniformf(locations["SCALE"]!!, renderable.worldTransform.scaleX)
+
         Gdx.gl.glDisable(GL20.GL_BLEND)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthMask(true)
         Gdx.gl.glDepthFunc(GL20.GL_LESS)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
         Gdx.gl.glCullFace(GL20.GL_BACK)
+        Gdx.gl.glEnable(GL40.GL_DEPTH_CLAMP)
+
         renderable.meshPart.render(program)
         renderable.meshPart.mesh.unbind(program)
+        Gdx.gl.glDisable(GL40.GL_DEPTH_CLAMP)
+
         Gdx.gl.glCullFace(GL20.GL_FRONT)
 
     }

@@ -8,6 +8,7 @@ uniform mat4 VIEW_PROJECTION;
 uniform mat4 ROTATION;
 uniform vec3 CAM_POS;
 uniform vec3 CAM_DIR;
+uniform float FCOEF;
 
 out vec4 near;
 out vec4 far;
@@ -20,7 +21,6 @@ void main() {
     vertexPos = POSITION_ATTRIBUTE;
     mvp  = VIEW_PROJECTION * WORLD;
     gl_Position = POSITION_ATTRIBUTE;
-
     mat4 mvpi = inverse(mvp);
     //2D projection of vertex in NDC
     vec2 pos = gl_Position.xy / gl_Position.w;

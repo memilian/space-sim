@@ -1,6 +1,5 @@
 import com.badlogic.gdx.tools.texturepacker.TexturePacker
 import com.kotcrab.vis.usl.Main
-import org.ajoberstar.grgit.*;
 
 
 buildscript {
@@ -15,7 +14,6 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
         classpath "com.kotcrab.vis:vis-usl:$uslVersion"
         classpath "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
-        classpath 'org.ajoberstar.grgit:grgit-core:4.0.2'
     }
 }
 
@@ -87,11 +85,3 @@ task compileSkin {
 }
 // Run `gradle packAndCompileSkin` to generate skin atlas and compile USL into JSON
 task packAndCompileSkin(dependsOn: [pack, compileSkin])
-
-task cloneLibraryGitRepo() {
-    def destinationPath = projectDir.path + "/libs/jhyphenator"
-    def destination = file(destinationPath)
-    if (!destination.exists()) {
-        Grgit.clone(dir: destinationPath, uri: "https://github.com/mfietz/JHyphenator.git")
-    }
-}

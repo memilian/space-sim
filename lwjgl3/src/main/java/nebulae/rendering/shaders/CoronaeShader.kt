@@ -44,11 +44,9 @@ class CoronaeShader : ShaderBase("shaders/coronae.vert.glsl", "shaders/coronae.f
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthMask(false)
         Gdx.gl.glEnable(GL20.GL_BLEND)
-        Gdx.gl.glBlendEquation(GL20.GL_FUNC_ADD)
-        Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE_MINUS_SRC_COLOR)
         renderable.meshPart.render(program)
         renderable.meshPart.mesh.unbind(program)
-        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
     }
 
     private val tmpQuat = Quaternion()

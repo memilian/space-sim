@@ -22,11 +22,14 @@ class Settings() {
     }
 
     class Game {
-        @Range(from = 0f, to = 10000f, step = 10f)
+        @Range(from = 0f, to = 1000000f, step = 10f)
         var timeSpeed = 1000f
     }
 
     class Graphics {
+        @Check()
+        var SRGB = false
+
         @Range(from = 0f, to = 10f, step = 0.1f)
         var bloomSaturation = 0.85f
 
@@ -71,7 +74,7 @@ class Settings() {
     class Generation {
         @WithDescription("Number of stars to generate")
         @Range(from = 10000f, to = 2_000_000f, step = 1000f)
-        var starCount = 100_000
+        var starCount = 30_000
 
         @Range(from = 1f, to = 10f, step = 1f)
         var armCount = 3
@@ -90,6 +93,9 @@ class Settings() {
     }
 
     class Debug {
+
+        @Check()
+        var isWireframe = false
 
         @Range(from = 0f, to = 5f, step = 0.005f)
         var factor = 0.45f;

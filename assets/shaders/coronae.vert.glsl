@@ -16,6 +16,8 @@ uniform vec3 CAM_INV_DIR;
 uniform vec2 SIZE;
 uniform vec2 RESOLUTION;
 
+uniform float FCOEF;
+
 out vec4 vertexPos;
 out vec4 basePos;
 
@@ -26,5 +28,6 @@ void main() {
     vec2 size = SIZE * 10.0;
     // size *= -view_pos.z; // Fixed size on screen
     gl_Position = PROJECTION * (view_pos + vec4(vertexPos.xy * size, 0, 0));
+    gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * FCOEF - 1.0;
     basePos = gl_Position;
 }

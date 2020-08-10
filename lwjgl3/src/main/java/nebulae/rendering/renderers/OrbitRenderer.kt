@@ -46,6 +46,13 @@ class OrbitRenderer(private val modelBatch: ModelBatch) : IRenderer {
         Gdx.gl.glLineWidth(0.1f)
         Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE_MINUS_SRC_ALPHA)
         for (node in orbits) {
+            val celestialBodyInfo = node.userData as CelestialBodyInfo
+            if (celestialBodyInfo.orbitalParameters.orbitingBody != null) {
+                tmp.set(celestialBodyInfo.orbitalParameters.orbitingBody!!.position)
+            } else {
+                tmp.set(0f, 0f, 0f)
+            }
+            node.transform.idt().translate(tmp)
             modelBatch.render(node)
         }
 
@@ -73,7 +80,9 @@ class OrbitRenderer(private val modelBatch: ModelBatch) : IRenderer {
                 part.line(pos1, pos2)
             }
             val model = builder.end()
-            orbits.add(ModelInstance(model))
+            val modelInst = ModelInstance(model)
+            modelInst.userData = body
+            orbits.add(modelInst)
         }
     }
 

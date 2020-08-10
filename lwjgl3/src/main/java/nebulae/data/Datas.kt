@@ -17,7 +17,12 @@ interface GameObject {
 
 interface ICelestialBody : GameObject {
     val bodyInfos: CelestialBodyInfo
+
+    fun isMoon(): Boolean {
+        return this.bodyInfos.orbitalParameters.orbitingBody != null && this.bodyInfos.orbitalParameters.orbitingBody is Planet
+    }
 }
+
 
 data class CelestialBodyInfo(
         val system: System,
@@ -47,7 +52,8 @@ data class OrbitalParameters(val eccentricity: Double,
                              val meanAnomalyAtEpoch: Double,
                              var trueAnomaly: Double,
                              var period: Double,
-                             var orbitingBody: ICelestialBody?) {
+                             var orbitingBody: ICelestialBody?,
+                             val soiRadius: Double) {
     fun toString(prefix: String): String {
         return """ orbiting ${when (orbitingBody == null) {
             true -> "none"
@@ -91,6 +97,22 @@ data class System(override val boundingBox: BoundingBox,
     override fun toString(): String {
         return toString("")
     }
+
+    override fun hashCode(): Int {
+        return name.hashCode() + seed.hashCode()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as System
+
+        if (name != other.name) return false
+        if (seed != other.seed) return false
+
+        return true
+    }
 }
 
 data class Planet(override val boundingBox: BoundingBox,
@@ -108,6 +130,21 @@ data class Planet(override val boundingBox: BoundingBox,
 
     override fun toString(): String {
         return toString("")
+    }
+
+    override fun hashCode(): Int {
+        return name.hashCode()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as System
+
+        if (name != other.name) return false
+
+        return true
     }
 }
 

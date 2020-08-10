@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g3d.utils.RenderContext
 import nebulae.data.Planet
 import nebulae.data.Star
 import nebulae.generation.Settings
+import org.lwjgl.opengl.GL40
 
 
 class PlanetShader : ShaderBase("shaders/planet.vert.glsl", "shaders/planet.frag.glsl", mapOf(
@@ -26,16 +27,29 @@ class PlanetShader : ShaderBase("shaders/planet.vert.glsl", "shaders/planet.frag
 
     override fun render(renderable: Renderable) {
         super.render(renderable)
+        var prevPrimitiveType = 0
+        if (Settings.debug.isWireframe) {
+            prevPrimitiveType = renderable.meshPart.primitiveType
+            renderable.meshPart.primitiveType = GL20.GL_LINE_STRIP
+        }
         val planet = renderable.userData as Planet
         program.setUniformf(locations["SEED"]!!, planet.bodyInfos.seed)
         Gdx.gl.glDisable(GL20.GL_BLEND)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDepthMask(true)
         Gdx.gl.glDepthFunc(GL20.GL_LESS)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
         Gdx.gl.glCullFace(GL20.GL_BACK)
+        Gdx.gl.glEnable(GL40.GL_DEPTH_CLAMP)
+
         renderable.meshPart.render(program)
         renderable.meshPart.mesh.unbind(program)
+        Gdx.gl.glDisable(GL40.GL_DEPTH_CLAMP)
+
         Gdx.gl.glCullFace(GL20.GL_FRONT)
+        if (Settings.debug.isWireframe) {
+            renderable.meshPart.primitiveType = prevPrimitiveType
+        }
     }
 
     override fun begin(camera: Camera, context: RenderContext) {

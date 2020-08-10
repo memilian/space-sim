@@ -203,7 +203,5 @@ void main()
     vec3 rd = f - ro;
     rd = normalize(rd);//ray's direction
     Ray ray = Ray(ro, rd);
-
-
     traceScene(ray);
 }

@@ -71,8 +71,8 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
     private val spriteBatch = SpriteBatch()
     val cameraInputController = BoundedCameraInputController(camera, Rectangle())
 
-    val vfx = VfxManager(Pixmap.Format.RGBA8888)
-    val bloom = BloomEffect()
+    private val vfx = VfxManager(Pixmap.Format.RGBA8888)
+    private val bloom = BloomEffect()
 
     private var focusedSelection: Selection<GameObject>? = null
         set(value) {
@@ -149,7 +149,6 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         }
     }
 
-
     override fun draw(_batch: Batch?, parentAlpha: Float) {
         super.draw(_batch, parentAlpha)
         handleResize()
@@ -215,25 +214,21 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         bloom.bloomSaturation = Settings.graphics.bloomSaturation
         vfx.useAsInput(backBufferRegion.texture)
         vfx.applyEffects()
+        if (Settings.graphics.SRGB) {
+            Gdx.gl.glEnable(GL40.GL_FRAMEBUFFER_SRGB)
+        }
         vfx.renderToScreen()
         if (viewMode == ViewMode.GALAXY) {
             octreeRenderer.renderToScreen(camera)
             selectionRenderer.renderToScreen(camera)
         }
+        if (Settings.graphics.SRGB) {
+            Gdx.gl.glDisable(GL40.GL_FRAMEBUFFER_SRGB)
+        }
 
-//        Gdx.gl.glEnable(GL40.GL_FRAMEBUFFER_SRGB)
-        orthoCamera.setToOrtho(false, width, height)
-        orthoCamera.update()
-//        polygonSpriteBatch.projectionMatrix = orthoCamera.combined
-//        polygonSpriteBatch.use {
-//            it.disableBlending()
-//            it.draw(backBufferRegion, 0f, 0f)
-//            it.flush()
-//        }
-//        Gdx.gl.glDisable(GL40.GL_FRAMEBUFFER_SRGB)
         endScene(_batch)
-    }
 
+    }
 
     private var ray: Ray? = null
     var gameTime = 0.1
@@ -293,7 +288,13 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
                 if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
                     if (focusedSelection?.item is System) {
                         val system = focusedSelection!!.item as System
-                        cameraInputController.target = system.planets.random().position
+                        if (system.planets.isNotEmpty()) {
+                            var selection: ICelestialBody = system.planets.random()
+                            while (selection.isMoon()) {
+                                selection = system.planets.random()
+                            }
+                            cameraInputController.target = selection.position
+                        }
                     }
                 }
             }
@@ -306,17 +307,18 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         skyboxNeedsUpdate = true
         cameraInputController.killScroll();
         cameraInputController.desiredTarget = Vector3()
-        cameraInputController.resetTimer();
+        cameraInputController.resetTimer()
         camera.position.set(0f, 0f, 0f)
-        cameraInputController.setTargetDistanceImmediate(5f);
+        cameraInputController.setTargetDistanceImmediate(5f)
     }
 
     private fun switchToGalaxyView() {
+        cameraInputController.target = focusedSelection!!.item.position.cpy()
         cameraInputController.desiredTarget = focusedSelection!!.item.position.cpy()
         camera.position.set(focusedSelection!!.item.position.cpy())
-        cameraInputController.setTargetDistanceImmediate(5f);
-        cameraInputController.killScroll();
-        cameraInputController.resetTimer();
+        cameraInputController.setTargetDistanceImmediate(5f)
+        cameraInputController.killScroll()
+        cameraInputController.resetTimer()
         viewMode = ViewMode.GALAXY
         println("switch view mode to GALAXY")
     }
@@ -327,7 +329,7 @@ class GenerationScene(private val generator: GalaxyGenerator, val universe: Univ
         viewportScreen.setWorldSize(width, height)
         val sx = viewportScreen.screenX
         val sy = viewportScreen.screenY
-        ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.worldWidth.toFloat(), viewportScreen.worldHeight.toFloat())
+        ray = camera.getPickRay((mx), (my), sx.toFloat(), sy.toFloat(), viewportScreen.worldWidth, viewportScreen.worldHeight)
 
         intersectingNodes.clear()
         generator.octree.intersect(ray!!, intersectingNodes)

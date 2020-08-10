@@ -15,33 +15,30 @@ import java.io.IOException
 import java.lang.Integer.max
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.math.log
 
-abstract class ShaderBase : Shader {
-    private val vertPath: Path
-    private val fragPath: Path
+abstract class ShaderBase(vertPath: String, fragPath: String, _uniforms: Map<String, String>, _customAttributes: Map<String, String>? = null) : Shader {
+    private val vertPath: Path = Path.of(vertPath)
+    private val fragPath: Path = Path.of(fragPath)
     private val referencedVertPath = mutableListOf<Path>();
     private val referencedFragPath = mutableListOf<Path>();
     private var startTime = TimeUtils.millis();
     lateinit var program: ShaderProgram
 
-    private val uniforms: MutableMap<String, String>
+    private val uniforms: MutableMap<String, String> = mutableMapOf(
+            "WORLD" to "u_World",
+            "VIEW_PROJECTION" to "u_ViewProjection",
+            "VIEW" to "u_View",
+            "PROJECTION" to "u_Projection",
+            "RESOLUTION" to "u_Resolution",
+            "TIME" to "u_Time",
+            "FCOEF" to "u_FCoef"
+    )
     private val attributes: MutableMap<String, String>
     protected val locations = mutableMapOf<String, Int>()
 
-    constructor(vertPath: String, fragPath: String, _uniforms: Map<String, String>, _customAttributes: Map<String, String>? = null) {
-        this.vertPath = Path.of(vertPath)
-        this.fragPath = Path.of(fragPath)
-
-        this.uniforms = mutableMapOf(
-                "WORLD" to "u_World",
-                "VIEW_PROJECTION" to "u_ViewProjection",
-                "VIEW" to "u_View",
-                "PROJECTION" to "u_Projection",
-                "RESOLUTION" to "u_Resolution",
-                "TIME" to "u_Time"
-        )
+    init {
         uniforms.putAll(_uniforms)
-
         this.attributes = mutableMapOf(
                 "POSITION_ATTRIBUTE" to ShaderProgram.POSITION_ATTRIBUTE,
                 "NORMAL_ATTRIBUTE" to ShaderProgram.NORMAL_ATTRIBUTE,
@@ -126,6 +123,7 @@ abstract class ShaderBase : Shader {
         program.setUniformMatrix(locations["VIEW_PROJECTION"]!!, camera.combined)
         program.setUniformi(locations["TIME"]!!, TimeUtils.timeSinceMillis(startTime).toInt())
         program.setUniformf(locations["RESOLUTION"]!!, Vector2(camera.viewportWidth, camera.viewportHeight))
+        program.setUniformf(locations["FCOEF"]!!, 2.0f / log(camera.far + 1.0f, 2.0f))
     }
 
     override fun render(renderable: Renderable) {

@@ -1,3 +1,1 @@
 include 'lwjgl3', 'core'
-include ':JHyphenator'
-project(':JHyphenator').projectDir = new File(settingsDir, '/libs/jhyphenator')
